@@ -1,0 +1,9 @@
+node_modules/
+build/
+data/chennai_osm.json
+data/osm.min.json
+data/osm.my.json
+data/osm.bn.json
+tex/
+vendor/
+viewer/
