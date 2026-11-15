@@ -378,7 +378,7 @@ export function makePlaces({ D, hash, roads, polyGeom, group }) {
     fuelStations();
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86 });
     let tris = 0;
-    for (const a of cells.values()) { if (!a.length) continue; const g = mergeGeometries(a); if (!g) continue; g.computeBoundingSphere(); g.computeBoundingBox(); tris += (g.index ? g.index.count : g.attributes.position.count) / 3; const m = new THREE.Mesh(g, mat); m.castShadow = m.receiveShadow = true; m.matrixAutoUpdate = false; m.updateMatrix(); group.add(m); }
+    for (const a of cells.values()) { if (!a.length) continue; const g = mergeGeometries(a); if (!g) continue; g.computeBoundingSphere(); g.computeBoundingBox(); tris += (g.index ? g.index.count : g.attributes.position.count) / 3; const m = new THREE.Mesh(g, mat); m.castShadow = m.receiveShadow = true; m.matrixAutoUpdate = false; m.updateMatrix(); m.name = 'place'; group.add(m); }
     if (boards.length) {
       const tex = boardAtlas(boardList), bm = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }), gs = [];
       for (const b of boards) { const g = new THREE.PlaneGeometry(b.w, b.w / 4), uv = g.attributes.uv, u0 = (b.i % 4) / 4, v0 = 1 - (Math.floor(b.i / 4) + 1) / 32; for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) / 4, v0 + uv.getY(i) / 32); g.rotateY(Math.atan2(b.nx, b.nz)); g.translate(b.x, b.y, b.z); gs.push(g); }

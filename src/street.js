@@ -85,7 +85,7 @@ export function addStreetLife({ D, group, roads, hash, rnd, addObb, inBuilding, 
     for (const a of cells.values()) {
       const im = new THREE.InstancedMesh(geo, mat, a.length);
       a.forEach(([l, gi], i) => { q.setFromAxisAngle(up, l.yaw || 0); sc.setScalar(l.s || 1); m4.compose(new THREE.Vector3(l.x, l.y || 0, l.z), q, sc); im.setMatrixAt(i, m4); if (colours) im.setColorAt(i, colours(l, gi)); });
-      im.computeBoundingSphere(); im.castShadow = opts.cast !== false; im.receiveShadow = true; im.matrixAutoUpdate = false; group.add(im); out.push(im);
+      im.computeBoundingSphere(); im.castShadow = opts.cast !== false; im.receiveShadow = true; im.matrixAutoUpdate = false; im.name = 'prop'; group.add(im); out.push(im);
     }
     return out;
   };
@@ -133,7 +133,7 @@ export function addStreetLife({ D, group, roads, hash, rnd, addObb, inBuilding, 
     inst(mergeGeometries(parts), std({ color: 0x9a968c }), poles.map(p => ({ x: p.x, z: p.z, yaw: p.yaw + Math.PI / 2 })));
     for (const p of poles) addObb(p.x, p.z, 0.15, 0.15, 1, 0);
     const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wire, 3));
-    const wl = new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: 0x15171a })); wl.matrixAutoUpdate = false; group.add(wl);
+    const wl = new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: 0x15171a })); wl.matrixAutoUpdate = false; wl.name = 'wire'; group.add(wl);
   }
 
   // ---- two-wheelers parked along the kerbs
@@ -249,7 +249,7 @@ export function addStreetLife({ D, group, roads, hash, rnd, addObb, inBuilding, 
       for (const t of [-0.5, 0.5]) bb.add(x - tz * t * w, 2.25, z + tx * t * w, 0.04, 2.25, 0.04, tx, tz, C(0x9a7a4a));
     }, [1]);
   }
-  const boxMat = std({ vertexColors: true, roughness: 0.88 }); for (const b of batches.values()) group.add(b.mesh(boxMat));
+  const boxMat = std({ vertexColors: true, roughness: 0.88 }); for (const b of batches.values()) { const bm = b.mesh(boxMat); bm.name = 'prop'; group.add(bm); }
   if (banner.length) {
     const p = [], uv = [], idx = [];
     banner.forEach((P, i) => { for (const v of P) { p.push(v[0], v[1], v[2]); uv.push(v[3], v[4]); } idx.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3); });

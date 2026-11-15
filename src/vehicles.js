@@ -121,8 +121,10 @@ export class Fleet {
       }
       const x = cars[o], z = cars[o + 1];
       const dx = x - cam.x, dz = z - cam.z;
-      const vis = dx * dx + dz * dz < 330 * 330;
+      const d2 = dx * dx + dz * dz, R = this.range || 330, vis = d2 < R * R;
       rec.g.visible = vis; if (!vis) continue;
+      // distant vehicles do not need to be drawn into the shadow map
+      const sh = d2 < 70 * 70; if (sh !== rec.sh) { rec.sh = sh; rec.g.traverse(m => { if (m.isMesh) m.castShadow = sh; }); }
       rec.g.position.set(x, 0, z); rec.g.rotation.y = cars[o + 2];
       // body roll/pitch from yaw-rate and braking for weight transfer
       const spd = cars[o + 12], brake = cars[o + 21] > 0.5;

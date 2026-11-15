@@ -212,7 +212,7 @@ export function buildCity(D, scene, opts = {}) {
     const tg = new THREE.CylinderGeometry(0.75, 0.7, 1.4, 14); tg.translate(0, 0.7, 0);
     const im = new THREE.InstancedMesh(tg, new THREE.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.55 }), tanks.length);
     const m4 = new THREE.Matrix4(); tanks.forEach((t, i) => { m4.makeTranslation(t[0], t[1], t[2]); im.setMatrixAt(i, m4); });
-    im.castShadow = true; im.receiveShadow = true; group.add(im);
+    im.castShadow = true; im.receiveShadow = true; im.name = 'tank'; group.add(im);
   }
 
   // ---------------- water ----------------
@@ -278,7 +278,7 @@ export function buildCity(D, scene, opts = {}) {
     const im = new THREE.InstancedMesh(g, lampMat, lamps.length), ih = new THREE.InstancedMesh(head, headMat, lamps.length);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
     lamps.forEach((l, i) => { q.setFromAxisAngle(up, Math.atan2(l.ax - l.x, l.az - l.z)); m4.compose(new THREE.Vector3(l.x, 0, l.z), q, one); im.setMatrixAt(i, m4); ih.setMatrixAt(i, m4); });
-    im.castShadow = true; group.add(im, ih);
+    im.castShadow = true; im.name = ih.name = 'lamp'; group.add(im, ih);
     // sodium light pools on the road (cheap stand-in for hundreds of real lights)
     const pc = document.createElement('canvas'); pc.width = pc.height = 128; const pg = pc.getContext('2d');
     const rg = pg.createRadialGradient(64, 64, 0, 64, 64, 64); rg.addColorStop(0, 'rgba(255,200,120,1)'); rg.addColorStop(0.45, 'rgba(255,170,80,0.45)'); rg.addColorStop(1, 'rgba(255,150,60,0)');
@@ -309,7 +309,22 @@ export function buildCity(D, scene, opts = {}) {
 
   D.street = addStreetLife({ D, group, roads, hash, rnd, addObb, inBuilding, fronts, roofs, coastX });
   console.log('real signs', D.realSigns); console.log('places', JSON.stringify(D.placeStats)); console.log('street', JSON.stringify(D.street));
-  return { group, roads, hash, boxes, grid, gw, gh, GC, gx0, gz0, lamps, coastX, water, byKind };
+  // City-wide instanced meshes (trees, palms, lamps, roof tanks) are split into 250 m cells so the renderer can skip
+  // the ones outside the view, and every detail mesh records its centre so far-away detail can be hidden.
+  for (const im of group.children.slice()) {
+    if (!im.isInstancedMesh || !/^(tree|palm|lamp|tank)$/.test(im.name) || im.count < 2) continue;
+    const cells = new Map(), m4 = new THREE.Matrix4(), col = new THREE.Color();
+    for (let i = 0; i < im.count; i++) { im.getMatrixAt(i, m4); const k = Math.floor(m4.elements[12] / 250) + ',' + Math.floor(m4.elements[14] / 250); let a = cells.get(k); if (!a) cells.set(k, a = []); a.push(i); }
+    for (const a of cells.values()) {
+      const c = new THREE.InstancedMesh(im.geometry, im.material, a.length);
+      a.forEach((src, i) => { im.getMatrixAt(src, m4); c.setMatrixAt(i, m4); if (im.instanceColor) { im.getColorAt(src, col); c.setColorAt(i, col); } });
+      c.castShadow = im.castShadow; c.receiveShadow = im.receiveShadow; c.renderOrder = im.renderOrder; c.name = im.name; c.matrixAutoUpdate = false; c.computeBoundingSphere(); group.add(c);
+    }
+    group.remove(im); im.dispose();
+  }
+  const lod = [];
+  for (const o of group.children) { if (!/^(tree|palm|lamp|tank|prop|wire|place)$/.test(o.name)) continue; let bs = o.boundingSphere; if (!bs) { if (o.isInstancedMesh) { o.computeBoundingSphere(); bs = o.boundingSphere; } else { if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); bs = o.geometry.boundingSphere; } } lod.push({ o, x: bs.center.x, z: bs.center.z, r: bs.radius, kind: o.name }); }
+  return { lod, group, roads, hash, boxes, grid, gw, gh, GC, gx0, gz0, lamps, coastX, water, byKind };
 }
 
 // ---------- helpers ----------
@@ -432,7 +447,7 @@ function addTrees(group, pts, rnd) {
     const a = new THREE.InstancedMesh(v.trunk, barkMat, list.length), b = new THREE.InstancedMesh(v.leaves, leafMat, list.length);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), c = new THREE.Color();
     list.forEach((p, k) => { const s = 0.8 + rnd() * 0.6; q.setFromAxisAngle(up, rnd() * 6.28); m4.compose(new THREE.Vector3(p[0], 0, p[1]), q, new THREE.Vector3(s, s * (0.85 + rnd() * 0.3), s)); a.setMatrixAt(k, m4); b.setMatrixAt(k, m4); c.setHSL(0.24 + rnd() * 0.06, 0.25 + rnd() * 0.2, 0.55 + rnd() * 0.3); b.setColorAt(k, c); });
-    a.castShadow = b.castShadow = true; b.receiveShadow = true; group.add(a, b);
+    a.castShadow = b.castShadow = true; b.receiveShadow = true; a.name = b.name = 'tree'; group.add(a, b);
   });
 }
 function addPalms(group, pts, rnd) {
@@ -452,5 +467,5 @@ function addPalms(group, pts, rnd) {
   const a = new THREE.InstancedMesh(tg, barkMat, pts.length), b = new THREE.InstancedMesh(fg, frMat, pts.length);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
   pts.forEach((p, k) => { const s = 0.85 + rnd() * 0.35; q.setFromAxisAngle(up, rnd() * 6.28); m4.compose(new THREE.Vector3(p[0], 0, p[1]), q, new THREE.Vector3(s, s, s)); a.setMatrixAt(k, m4); b.setMatrixAt(k, m4); });
-  a.castShadow = b.castShadow = true; group.add(a, b);
+  a.castShadow = b.castShadow = true; a.name = b.name = 'palm'; group.add(a, b);
 }

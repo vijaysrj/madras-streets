@@ -32,7 +32,7 @@ async function main() {
   // ---------------- renderer ----------------
   const canvas = $('gl'), hud = $('hud'), ctx = hud.getContext('2d');
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.1));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.85;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -357,7 +357,7 @@ async function main() {
     hemi.color.set(0xcfe3ff).lerp(new THREE.Color(0x30406a), night);
     const fogDay = new THREE.Color(0xb9c5cf), fogDusk = new THREE.Color(0xd09a78), fogNight = new THREE.Color(0x0b0f18), fogRain = new THREE.Color(0x8d969c);
     scene.fog.color.copy(fogDay).lerp(fogDusk, dusk).lerp(fogNight, night).lerp(fogRain.clone().multiplyScalar(1 - night * 0.85), G.rain);
-    scene.fog.density = 0.00065 + G.rain * 0.0035 + night * 0.0006;
+    scene.fog.density = (G.fogBase || 0.00065) + G.rain * 0.0035 + night * 0.0006;
     renderer.toneMappingExposure = lerp(0.72, 1.2, night);
     sea.material.color.set(night > 0.5 ? 0x050c12 : 0x1d4a5c);
     // sky-based environment for reflections, refreshed when the light changes
@@ -386,6 +386,7 @@ async function main() {
     G.rain += (G.rainTarget - G.rain) * Math.min(1, dt * 0.4);
     if (pressed.KeyM) G.bigMap = !G.bigMap;
     if (pressed.KeyV) G.view = (G.view + 1) % 2;
+    if (pressed.KeyP) G.cycleQuality();
     // roadside mechanic: stop the vehicle and press G to have it repaired for a fee
     if (pressed.KeyG) {
       if (pcarIdx < 0) toast('Get in the vehicle you want repaired first.', 3);
@@ -482,7 +483,10 @@ async function main() {
   }
 
   const tmpV = new THREE.Vector3();
+  const camFwd = new THREE.Vector3(), LODR = { tree: 650, palm: 800, lamp: 420, tank: 450, prop: 330, wire: 200, place: 900 };
+  const P = G.prof = { upd: 0, pre: 0, gl: 0, hud: 0, n: 0, t0: 0 };
   function render(dt) {
+    P.t0 = performance.now();
     lighting();
     const inCar = pcarIdx >= 0, ptype = inCar ? cars[pcarIdx * CF + 6] | 0 : -1, px = G.px, pz = G.pz, ph = G.ph;
     G.orbitT -= dt; if (G.orbitT <= 0) G.orbit *= Math.pow(0.15, dt);
@@ -505,7 +509,7 @@ async function main() {
       camera.fov = 60 + Math.min(12, Math.abs(G.pspd) * 0.4);
     }
     if (G.camOverride) G.camOverride(camera);
-    camera.updateProjectionMatrix();
+    camera.updateProjectionMatrix(); camera.getWorldDirection(camFwd);
     // shadows follow the player
     const sx = Math.round(px / 4) * 4, sz = Math.round(pz / 4) * 4;
     sun.position.set(sx + sunV.x * 400, Math.max(30, sunV.y * 400), sz + sunV.z * 400); sun.target.position.set(sx, 0, sz); sun.target.updateMatrixWorld();
@@ -513,7 +517,7 @@ async function main() {
     waterNormals.offset.set(G.time * 0.004, G.time * 0.0025);
     // vehicles, people
     fleet.update(cars, CF, MAXCARS, pcarIdx, camera.position, dt, G.night, cockpit);
-    crowd.update(peds, PF, MAXPEDS, camera.position, dt);
+    crowd.fwd = [camFwd.x, camFwd.z]; crowd.update(peds, PF, MAXPEDS, camera.position, dt);
     me.obj.visible = !inCar; if (!inCar) { me.obj.position.set(pl[0], 0, pl[1]); me.obj.rotation.y = pl[2]; Crowd.blend(me, pl[3], dt); }
     // owned vehicle markers
     let n = 0; const m4 = new THREE.Matrix4();
@@ -561,8 +565,12 @@ async function main() {
       }
       rainGeo.attributes.position.needsUpdate = true; rain.material.opacity = 0.35 * G.rain;
     }
-    renderer.render(scene, camera);
-    drawHud();
+    G.frameN = (G.frameN | 0) + 1;
+    // hide far-away detail (parked bikes, poles, wires, trees, roof tanks): at a distance it is a few pixels of work for nothing
+    if (G.frameN % 8 === 1) { const cx = camera.position.x, cz = camera.position.z, k = Q.lod; for (const l of city.lod) l.o.visible = Math.hypot(l.x - cx, l.z - cz) - l.r < LODR[l.kind] * k; } if (Q.shadow) renderer.shadowMap.needsUpdate = G.frameN % Q.shadow === 0;
+    const tA = performance.now(); P.pre += tA - P.t0;
+    renderer.render(scene, camera); const tB = performance.now(); P.gl += tB - tA;
+    drawHud(); P.hud += performance.now() - tB; P.n++;
   }
 
   // ---------------- HUD ----------------
@@ -600,7 +608,7 @@ async function main() {
       { const lastS = J.si === J.stops.length - 1, k = J.kind, verb = J.stage === 'pickup' ? (J.challenge ? 'Start at' : 'Pick up at') : J.challenge ? (lastS ? 'Finish at' : 'Checkpoint:') : k === 'share' ? (lastS ? 'Drop everyone at' : 'Next pickup:') : k === 'tour' ? 'Tour stop:' : /^(ride|school|hospital)$/.test(k) ? 'Drop passenger at' : 'Deliver to'; ctx.fillStyle = J.col; ctx.fillText(`${J.label.replace('Challenge: ', '')} · ${verb} ${tgt.name}`, x0 + 16 * D, 24 * D, pw - 32 * D); }
       ctx.font = font(13, 500); ctx.fillStyle = '#c9d1d9'; const d = (G.routeLeft > 0 ? G.routeLeft : Math.hypot(tgt.stop.x - px, tgt.stop.z - pz)) / 1000, left = J.limit - J.t;
       ctx.fillText(`${d < 1 ? Math.round(d * 100) * 10 + ' m' : d.toFixed(1) + ' km'} by road${J.stage === 'carry' ? ` · ${left > 0 ? Math.ceil(left) + 's left' : 'running late'} · ${J.kind === 'test' ? 'faults ' + J.faults + '/2' : J.kind === 'fragile' ? 'cargo ' + Math.round(J.cargo) + '%' : J.kind === 'clean' ? 'no scratches so far' : J.rating.toFixed(1) + '★'}${J.stops.length > 2 ? ' · stop ' + J.si + ' of ' + (J.stops.length - 1) : ''}` : ''} · X to cancel`, x0 + 16 * D, 48 * D, pw - 32 * D);
-    } else { ctx.font = font(13, 500); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.textAlign = 'center'; ctx.fillText('J jobs · M map · V driver view · T skip hour · R rain · ? help', w / 2, 20 * D); ctx.textAlign = 'left'; }
+    } else { ctx.font = font(13, 500); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.textAlign = 'center'; ctx.fillText('J jobs · M map · V driver view · P graphics · T skip hour · R rain · ? help', w / 2, 20 * D); ctx.textAlign = 'left'; }
     G.msg = G.msg.filter(m => m.until > G.time);
     let my = h - (pcarIdx >= 0 ? 200 : 110) * D - G.msg.length * 36 * D; ctx.textAlign = 'center';
     for (const m of G.msg) { ctx.font = font(15, 600); const tw = ctx.measureText(m.t).width + 28 * D; panel(w / 2 - tw / 2, my, tw, 30 * D); ctx.fillStyle = '#fff'; ctx.fillText(m.t, w / 2, my + 7 * D); my += 36 * D; }
@@ -638,7 +646,7 @@ async function main() {
       if (dmg > 35) { const m = dmg >= 100 ? 'Vehicle badly damaged and crawling. Stop and press G (FIX) to repair it.' : 'Vehicle damaged. Stop and press G (FIX) for a mechanic.'; ctx.font = font(14, 700); ctx.textAlign = 'center'; const tw = ctx.measureText(m).width + 28 * D; panel(w / 2 - tw / 2, 82 * D, tw, 30 * D); ctx.fillStyle = dmg >= 100 ? '#ff7b72' : '#f2cc60'; ctx.fillText(m, w / 2, 89 * D); ctx.textAlign = 'left'; }
     } else for (const ov of G.owned) { const c = ov.i * CF; if (cars[c + 7] && Math.hypot(cars[c] - px, cars[c + 1] - pz) < cars[c + 14] + 2) { ctx.font = font(15, 700); ctx.textAlign = 'center'; panel(w / 2 - 150 * D, h * 0.64, 300 * D, 34 * D); ctx.fillStyle = '#fff'; ctx.fillText(`Press F to get in your ${ov.name}`, w / 2, h * 0.64 + 9 * D); ctx.textAlign = 'left'; } }
     if (G.help) {
-      const lines = ['W/S or ↑/↓ accelerate and brake/reverse, A/D steer, Space handbrake, H horn', 'F get in or out of your vehicle. Traffic keeps LEFT, as in Chennai', 'On foot: WASD walk, Shift to jog, Q/E turn the camera', 'J job list · X cancel job · M city map · V driver view', 'G mechanic: stop and press G to repair a damaged vehicle (costs money)', 'T skip one hour (try night) · R monsoon rain · drag to look around, wheel to zoom', 'Cyan markers are your vehicles: auto, scooter, hatchback and taxi', 'Map data © OpenStreetMap contributors (ODbL)'];
+      const lines = ['W/S or ↑/↓ accelerate and brake/reverse, A/D steer, Space handbrake, H horn', 'F get in or out of your vehicle. Traffic keeps LEFT, as in Chennai', 'On foot: WASD walk, Shift to jog, Q/E turn the camera', 'J job list · X cancel job · M city map · V driver view', 'P graphics: Battery saver, Balanced or High. Lower settings keep a laptop cool', 'G mechanic: stop and press G to repair a damaged vehicle (costs money)', 'T skip one hour (try night) · R monsoon rain · drag to look around, wheel to zoom', 'Cyan markers are your vehicles: auto, scooter, hatchback and taxi', 'Map data © OpenStreetMap contributors (ODbL)'];
       ctx.font = font(14, 500); const pw = Math.min(720 * D, w - 40 * D), ph = (lines.length * 22 + 50) * D, x0 = (w - pw) / 2, y0 = h * 0.22;
       panel(x0, y0, pw, ph); ctx.fillStyle = '#fff'; ctx.font = font(17, 700); ctx.fillText('Controls', x0 + 18 * D, y0 + 14 * D); ctx.font = font(14, 500); ctx.fillStyle = '#d0d7de'; lines.forEach((l, i) => ctx.fillText(l, x0 + 18 * D, y0 + (44 + i * 22) * D));
     }
@@ -666,23 +674,41 @@ async function main() {
     ctx.font = font(10, 500); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.textAlign = 'right'; ctx.fillText(`${fps.toFixed(0)} fps · © OpenStreetMap contributors`, w - 8 * D, 8 * D); ctx.textAlign = 'left';
   }
 
-  let slowT = 0, qLevel = 0, lastT = performance.now();
+  // ---- graphics quality: three presets, switched with P; "Balanced" is the default and keeps a laptop cool ----
+  const QUAL = [
+    { name: 'Battery saver', pr: 0.8, fps: 30, shadow: 0, far: 1500, fog: 0.0011, ppl: 14, pplR: 60, pplSh: 0, veh: 220, lod: 0.6 },
+    { name: 'Balanced', pr: 1.1, fps: 30, shadow: 2, far: 2500, fog: 0.00065, ppl: 24, pplR: 90, pplSh: 6, veh: 300, lod: 1 },
+    { name: 'High', pr: 1.5, fps: 60, shadow: 1, far: 6000, fog: 0.00065, ppl: 40, pplR: 140, pplSh: 12, veh: 330, lod: 2 },
+  ];
+  let Q = QUAL[1], qIdx = 1, slowT = 0, qLevel = 0, lastT = performance.now();
+  function applyQuality(i, quiet) {
+    qIdx = i; Q = QUAL[i]; qLevel = 0; slowT = 0; G.quality = Q.name;
+    renderer.setPixelRatio(Math.min(devicePixelRatio, Q.pr)); resize();
+    sun.castShadow = Q.shadow > 0; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
+    camera.far = Q.far; camera.updateProjectionMatrix(); if (scene.fog) scene.fog.density = Q.fog; G.fogBase = Q.fog;
+    crowd.maxShow = Q.ppl; crowd.range = Q.pplR; crowd.shadowN = Q.pplSh; fleet.range = Q.veh;
+    try { localStorage.setItem('madras-streets-quality', String(i)); } catch (e) {}
+    if (!quiet) toast(`Graphics: ${Q.name} (${Q.fps} frames a second). Press P to change.`, 4);
+  }
+  { let i = 1; try { const v = localStorage.getItem('madras-streets-quality'); if (v !== null && QUAL[+v]) i = +v; } catch (e) {} applyQuality(i, true); }
+  G.cycleQuality = () => applyQuality((qIdx + 1) % QUAL.length);
   renderer.setAnimationLoop(() => {
-    // never draw faster than ~70 frames a second: high-refresh screens otherwise double the work and the heat
-    const now = performance.now(), raw = (now - lastT) / 1000; if (raw < 0.013) return; lastT = now;
+    // frame cap: 30 a second on Balanced, 60 on High. Drawing faster only makes heat.
+    const now = performance.now(), raw = (now - lastT) / 1000; if (raw < (Q.fps >= 60 ? 0.013 : 0.030)) return; lastT = now;
     frames++; fpsT += raw; if (fpsT > 0.5) { fps = frames / fpsT; frames = 0; fpsT = 0; }
-    // adaptive quality: step down resolution, then shadows, if the machine cannot hold ~30 fps
-    if (!G.paused && !G.noAdapt) { slowT = fps < 30 ? slowT + raw : 0; if (slowT > 2.5 && qLevel < 4) { qLevel++; slowT = 0; G.qLevel = qLevel;
-      if (qLevel === 1) renderer.setPixelRatio(1);
-      if (qLevel === 2) { sun.castShadow = false; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true; }
-      if (qLevel === 3) renderer.setPixelRatio(0.8);
-      if (qLevel === 4) { renderer.setPixelRatio(0.65); camera.far = 1800; camera.updateProjectionMatrix(); }
+    // if the machine still cannot keep up, step down further on its own
+    if (!G.paused && !G.noAdapt) { slowT = fps < Math.min(24, Q.fps * 0.8) ? slowT + raw : 0; if (slowT > 2.5 && qLevel < 3) { qLevel++; slowT = 0; G.qLevel = qLevel;
+      if (qLevel === 1) { sun.castShadow = false; renderer.shadowMap.needsUpdate = true; Q = { ...Q, shadow: 0 }; }
+      if (qLevel === 2) { renderer.setPixelRatio(Math.min(devicePixelRatio, Q.pr * 0.75)); resize(); }
+      if (qLevel === 3) { camera.far = Math.min(camera.far, 1500); camera.updateProjectionMatrix(); crowd.maxShow = 12; }
       } }
     // game time keeps real speed on a slow machine: up to 0.15 s per frame, simulated in steps of 0.05 s
     let rem = Math.min(0.15, raw);
     // one bad frame must never stop the game
     try {
+      const tU = performance.now();
       if (!G.paused) while (rem > 1e-4) { const st = Math.min(0.05, rem); update(st); rem -= st; for (const k in pressed) delete pressed[k]; }
+      P.upd += performance.now() - tU;
       render(Math.min(0.05, raw));
     } catch (e) { if (!G.errShown) { G.errShown = 1; console.error(e); } }
     for (const k in pressed) delete pressed[k];

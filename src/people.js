@@ -298,25 +298,30 @@ export class Crowd {
   }
   // peds: Float32Array from the simulation (PF floats each)
   update(peds, PF, maxPeds, cam, dt) {
-    const near = [];
+    const near = [], R2 = (this.range || 140) ** 2, fwd = this.fwd || [0, 0], maxShow = Math.min(this.items.length, this.maxShow || this.items.length), shN = this.shadowN ?? 8;
     for (let i = 0; i < maxPeds; i++) {
       const o = i * PF; if (!peds[o + 3]) continue;
       const dx = peds[o] - cam.x, dz = peds[o + 1] - cam.z, d = dx * dx + dz * dz;
-      if (d < 140 * 140) near.push([d, i]);
+      if (d < R2 && (d < 64 || dx * fwd[0] + dz * fwd[1] > -4)) near.push([d, i]); // not the ones behind the camera
     }
     near.sort((a, b) => a[0] - b[0]);
-    const want = new Set(near.slice(0, this.items.length).map(a => a[1]));
+    const want = new Set(near.slice(0, maxShow).map(a => a[1])), shadowSet = new Set(near.slice(0, shN).map(a => a[1]));
+    this.frame = (this.frame | 0) + 1;
     for (const it of this.items) if (it.slot >= 0 && !want.has(it.slot)) { it.slot = -1; it.obj.visible = false; }
     const taken = new Set(this.items.filter(it => it.slot >= 0).map(it => it.slot));
     for (const s of want) if (!taken.has(s)) { const it = this.items.find(t => t.slot < 0 && (peds[s * PF + 10] % 2 === 0) === t.female) || this.items.find(t => t.slot < 0); if (it) { it.slot = s; it.obj.visible = true; it.x = peds[s * PF]; it.z = peds[s * PF + 1]; } }
     for (const it of this.items) {
       if (it.slot < 0) continue;
       const o = it.slot * PF, x = peds[o], z = peds[o + 1];
-      const sp = Math.hypot(x - it.x, z - it.z) / Math.max(dt, 1e-3);
+      const sp = it.sp = it.sp === undefined ? 1.2 : it.sp + (Math.hypot(x - it.x, z - it.z) / Math.max(dt, 1e-3) - it.sp) * 0.3;
       it.x = x; it.z = z;
       it.obj.position.set(x, 0, z); it.obj.rotation.y = peds[o + 2];
       const st = peds[o + 3];
-      Crowd.blend(it, st === 2 ? 0 : Math.min(sp, 6), dt);
+      // only the closest few cast shadows; far walkers are animated every third frame
+      const sh = shadowSet.has(it.slot); if (sh !== it.sh) { it.sh = sh; it.obj.traverse(m => { if (m.isMesh) m.castShadow = sh; }); }
+      const dxc = x - cam.x, dzc = z - cam.z, far = dxc * dxc + dzc * dzc > 45 * 45; it.acc = (it.acc || 0) + dt;
+      if (far && (this.frame + it.slot) % 3) continue;
+      Crowd.blend(it, st === 2 ? 0 : Math.min(sp, 6), it.acc); it.acc = 0;
     }
   }
 }
