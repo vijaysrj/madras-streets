@@ -27,7 +27,8 @@ export function buildCity(D, scene, opts = {}) {
   const setRep = (m, s) => { for (const k of ['map', 'normalMap', 'roughnessMap']) if (m[k]) m[k].repeat.set(s, s); };
   // world-space UVs are written in metres, so repeat = 1/tileSize
   setRep(M.ground, 1 / 6); setRep(M.grass, 1 / 4); setRep(M.sand, 1 / 5); setRep(M.asphalt, 1 / 7); setRep(M.paving, 1 / 2.5); setRep(M.concrete, 1 / 4);
-  const flat = (m, order) => { m.polygonOffset = true; m.polygonOffsetFactor = -order; m.polygonOffsetUnits = -order * 2; return m; };
+  // a small slope factor only: a large one pushes close-up ground past the near depth limit on some phone GPUs, and the layer vanishes
+  const flat = (m, order) => { m.polygonOffset = true; m.polygonOffsetFactor = -0.25 * order; m.polygonOffsetUnits = -order * 4; return m; };
   flat(M.grass, 1); flat(M.sand, 1); flat(M.paving, 2); flat(M.asphalt, 3); flat(M.concrete, 1);
   const markMat = flat(new THREE.MeshStandardMaterial({ color: 0xf0eee6, roughness: 0.7 }), 4);
   const yellowMat = flat(new THREE.MeshStandardMaterial({ color: 0xe0b23a, roughness: 0.7 }), 4);

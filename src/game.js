@@ -178,7 +178,7 @@ async function main() {
 
   // ---------------- game state ----------------
   const store = (() => { try { return JSON.parse(localStorage.getItem('madras-streets-2') || '{}'); } catch (e) { return {}; } })();
-  const G = { day: store.day || '', gv: store.gv || {}, claimed: store.claimed || {}, licence: !!store.licence, money: store.money ?? 500, trips: store.trips ?? 0, ratingSum: store.ratingSum ?? 0, hour: (() => { const d = new Date(), h = (d.getUTCHours() + d.getUTCMinutes() / 60 + 5.5) % 24; return h >= 7 && h <= 15.5 ? h : 10; })(), rain: 0, rainTarget: 0, view: 0, bigMap: false, help: false, paused: true, job: null, offers: null, msg: [], area: '', areaT: 0, route: null, routeT: 0, owned: [], camYaw: 0, camPitch: 0.28, camDist: 8, orbit: 0, orbitT: 0, time: 0, night: 0 };
+  const G = { day: store.day || '', gv: store.gv || {}, claimed: store.claimed || {}, licence: !!store.licence, money: store.money ?? 500, trips: store.trips ?? 0, ratingSum: store.ratingSum ?? 0, hour: (() => { const d = new Date(), h = (d.getUTCHours() + d.getUTCMinutes() / 60 + 5.5) % 24; return h >= 7 && h <= 15.5 ? h : 10; })(), rain: 0, rainTarget: 0, view: 0, bigMap: false, help: false, paused: true, job: null, offers: null, msg: [], area: '', areaT: 0, route: null, routeT: 0, owned: [], camYaw: 0, camPitch: 0.28, camDist: 8, sky: false, skyH: 260, skyYaw: 0, skyTilt: 0.95, orbit: 0, orbitT: 0, time: 0, night: 0 };
   const save = () => { try { localStorage.setItem('madras-streets-2', JSON.stringify({ money: G.money, trips: G.trips, ratingSum: G.ratingSum, day: G.day, gv: G.gv, claimed: G.claimed, licence: G.licence })); } catch (e) {} };
   const toast = (t, dur = 4) => { G.msg.push({ t, until: G.time + dur }); if (G.msg.length > 2) G.msg.shift(); };
   S.set_counts(124, 170);
@@ -265,13 +265,29 @@ async function main() {
   canvas.addEventListener('pointerdown', e => {
     // tap or click a job in the list to accept it
     if (G.offers && G.offerRects) { const hx = e.clientX * hud.width / innerWidth, hy = e.clientY * hud.height / innerHeight; const k = G.offerRects.findIndex(r => hx >= r[0] && hx <= r[2] && hy >= r[1] && hy <= r[3]); if (k >= 0) { acceptOffer(k); return; } }
-    drag = { x: e.clientX, y: e.clientY };
+    if (e.pointerType !== 'mouse' && (G.offers || G.bigMap || G.help)) { G.offers = null; G.bigMap = false; G.help = false; return; }
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinch = 0;
+    drag = pts.size === 1 ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
   });
-  addEventListener('pointerup', () => { drag = null; });
-  addEventListener('pointermove', e => { if (drag && e.pointerType === 'mouse') { G.orbit += (e.clientX - drag.x) * 0.006; G.camPitch = Math.max(0.03, Math.min(1.2, G.camPitch + (e.clientY - drag.y) * 0.004)); drag = { x: e.clientX, y: e.clientY }; G.orbitT = 3; } });
-  canvas.addEventListener('wheel', e => { G.camDist = Math.max(3.5, Math.min(30, G.camDist * (e.deltaY > 0 ? 1.1 : 0.9))); e.preventDefault(); }, { passive: false });
+  const pts = new Map(); let pinch = 0;
+  const ptUp = e => { pts.delete(e.pointerId); pinch = 0; drag = null; };
+  addEventListener('pointerup', ptUp); addEventListener('pointercancel', ptUp);
+  // zoom: wheel or pinch. Zooming out past the chase camera lifts into the view from above; zooming in comes back down.
+  function zoomBy(f) {
+    if (G.sky) { G.skyH *= f; if (G.skyH < 55) { G.sky = false; G.camDist = 28; } G.skyH = Math.max(55, Math.min(1400, G.skyH)); }
+    else { const d = G.camDist * f; if (d > 34 && G.view === 0) { G.sky = true; G.skyH = 70; G.skyYaw = G.camYaw + G.orbit; } G.camDist = Math.max(3.5, Math.min(30, d)); }
+  }
+  addEventListener('pointermove', e => {
+    if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch > 0 && d > 0) zoomBy(Math.max(0.8, Math.min(1.25, pinch / d))); pinch = d; return; }
+    if (drag && drag.id === e.pointerId) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (G.sky) { G.skyYaw += dx * 0.006; G.skyTilt = Math.max(0.35, Math.min(1.45, G.skyTilt + dy * 0.004)); }
+      else { G.orbit += dx * 0.006; G.camPitch = Math.max(0.03, Math.min(1.2, G.camPitch + dy * 0.004)); G.orbitT = 3; }
+      drag.x = e.clientX; drag.y = e.clientY; } });
+  canvas.addEventListener('wheel', e => { zoomBy(e.deltaY > 0 ? 1.1 : 0.9); e.preventDefault(); }, { passive: false });
+  addEventListener('contextmenu', e => e.preventDefault());
   document.querySelectorAll('[data-key]').forEach(b => { const k = b.dataset.key; b.addEventListener('pointerdown', e => { e.preventDefault(); if (!keys[k]) pressed[k] = true; keys[k] = true; b.classList.add('on'); }); const up = () => { keys[k] = false; b.classList.remove('on'); }; b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up); });
-  if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
+  const TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 && matchMedia('(hover: none)').matches; if (TOUCH) document.body.classList.add('touch');
   let steerS = 0;
 
   // ---------------- audio ----------------
@@ -337,7 +353,7 @@ async function main() {
   addEventListener('resize', resize); resize();
   loading.style.display = 'none'; $('title').style.display = 'flex';
   $('mapName').textContent = MAP.title; $('switchBtn').style.display = 'none';
-  $('startBtn').onclick = () => { $('title').style.display = 'none'; G.paused = false; initAudio(); if (A.ctx) A.ctx.resume(); toast('Your yellow auto is parked beside you.', 5); };
+  $('startBtn').onclick = () => { $('title').style.display = 'none'; G.paused = false; document.body.classList.add('playing'); if (TOUCH) { try { const r = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen({ navigationUI: 'hide' }); if (r && r.catch) r.catch(() => {}); } catch (e) {} } initAudio(); if (A.ctx) A.ctx.resume(); toast(TOUCH ? 'Your yellow auto is beside you. Tap IN/OUT to get in.' : 'Your yellow auto is parked beside you.', 5); };
   window.__game = { G, S, cars, pl, keys, pressed, D, city, scene, camera, renderer, LM, crowd, fleet };
   const clockStr = () => { const h = Math.floor(G.hour), m = Math.floor((G.hour - h) * 60); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
   const lerp = (a, b, t) => a + (b - a) * t, clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -357,7 +373,7 @@ async function main() {
     hemi.color.set(0xcfe3ff).lerp(new THREE.Color(0x30406a), night);
     const fogDay = new THREE.Color(0xb9c5cf), fogDusk = new THREE.Color(0xd09a78), fogNight = new THREE.Color(0x0b0f18), fogRain = new THREE.Color(0x8d969c);
     scene.fog.color.copy(fogDay).lerp(fogDusk, dusk).lerp(fogNight, night).lerp(fogRain.clone().multiplyScalar(1 - night * 0.85), G.rain);
-    scene.fog.density = (G.fogBase || 0.00065) + G.rain * 0.0035 + night * 0.0006;
+    scene.fog.density = ((G.fogBase || 0.00065) + G.rain * 0.0035 + night * 0.0006) * (G.sky ? Math.min(1, 110 / G.skyH) : 1);
     renderer.toneMappingExposure = lerp(0.72, 1.2, night);
     sea.material.color.set(night > 0.5 ? 0x050c12 : 0x1d4a5c);
     // sky-based environment for reflections, refreshed when the light changes
@@ -385,7 +401,8 @@ async function main() {
     if (pressed.KeyR) { G.rainTarget = G.rainTarget > 0 ? 0 : 1; toast(G.rainTarget ? 'Northeast monsoon shower rolling in…' : 'Rain clearing up.', 3); }
     G.rain += (G.rainTarget - G.rain) * Math.min(1, dt * 0.4);
     if (pressed.KeyM) G.bigMap = !G.bigMap;
-    if (pressed.KeyV) G.view = (G.view + 1) % 2;
+    if (pressed.KeyV) { G.view = (G.view + 1) % 2; G.sky = false; }
+    if (pressed.KeyZ) { G.sky = !G.sky; if (G.sky) { G.view = 0; G.skyH = Math.max(G.skyH, 200); G.skyYaw = G.camYaw + G.orbit; toast(TOUCH ? 'View from above. Pinch to zoom, drag to turn, SKY to come back.' : 'View from above. Wheel to zoom, drag to turn, Z to come back.', 5); } }
     if (pressed.KeyP) G.cycleQuality();
     // roadside mechanic: stop the vehicle and press G to have it repaired for a fee
     if (pressed.KeyG) {
@@ -412,9 +429,9 @@ async function main() {
     steerS += clamp((gp && gpSteer ? gpSteer : st) - steerS, -dt * 3.2, dt * 3.2);
     if (pcarIdx >= 0) { inp[0] = thr; inp[1] = brk; inp[2] = steerS; inp[3] = keys.Space ? 1 : 0; inp[4] = 0; inp[5] = 0; }
     else {
-      const f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0), s = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
+      const f = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0), s = TOUCH ? 0 : (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
       const cy = G.camYaw + G.orbit, fx = Math.sin(cy), fz = Math.cos(cy), rx = -Math.cos(cy), rz = Math.sin(cy);
-      let mx = fx * f + rx * s, mz = fz * f + rz * s; const ml = Math.hypot(mx, mz), spd = keys.ShiftLeft || keys.ShiftRight ? 4.6 : 1.5;
+      let mx = fx * f + rx * s, mz = fz * f + rz * s; const ml = Math.hypot(mx, mz), spd = keys.ShiftLeft || keys.ShiftRight || TOUCH ? 4.6 : 1.5;
       if (ml > 0) { mx = mx / ml * spd; mz = mz / ml * spd; }
       inp[0] = inp[1] = inp[2] = inp[3] = 0; inp[4] = mx; inp[5] = mz;
     }
@@ -490,9 +507,9 @@ async function main() {
     lighting();
     const inCar = pcarIdx >= 0, ptype = inCar ? cars[pcarIdx * CF + 6] | 0 : -1, px = G.px, pz = G.pz, ph = G.ph;
     G.orbitT -= dt; if (G.orbitT <= 0) G.orbit *= Math.pow(0.15, dt);
-    const cockpit = inCar && G.view === 1;
+    const cockpit = inCar && G.view === 1 && !G.sky;
     if (inCar) G.camYaw += (((ph - G.camYaw) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * 3);
-    else { const turn = (keys.KeyQ ? 1 : 0) - (keys.KeyE ? 1 : 0); G.camYaw += turn * dt * 1.8; }
+    else { const turn = (keys.KeyQ || TOUCH && keys.KeyA ? 1 : 0) - (keys.KeyE || TOUCH && keys.KeyD ? 1 : 0); G.camYaw += turn * dt * 1.8; }
     const yaw = G.camYaw + G.orbit;
     if (cockpit) {
       const rx = -Math.cos(ph), rz = Math.sin(ph), fx = Math.sin(ph), fz = Math.cos(ph);
@@ -500,7 +517,7 @@ async function main() {
       camera.position.set(px + rx * side + fx * fo, hgt, pz + rz * side + fz * fo);
       camera.lookAt(camera.position.x + fx * 10, hgt - 0.5, camera.position.z + fz * 10);
       camera.fov = 70;
-    } else {
+    } else if (!G.sky) {
       const big = ptype === 2 ? 1.8 : 1, dist = inCar ? G.camDist * big : Math.min(G.camDist * 0.6, 5), hgt = inCar ? 1.6 * big : 1.5;
       const fx = Math.sin(yaw), fz = Math.cos(yaw), cp = G.camPitch;
       tmpV.set(px - fx * dist * Math.cos(cp), hgt + dist * Math.sin(cp), pz - fz * dist * Math.cos(cp));
@@ -508,6 +525,11 @@ async function main() {
       camera.lookAt(px + fx * 2, hgt, pz + fz * 2);
       camera.fov = 60 + Math.min(12, Math.abs(G.pspd) * 0.4);
     }
+    if (G.sky) {
+      const H = G.skyH, back = H / Math.tan(G.skyTilt), fx = Math.sin(G.skyYaw), fz = Math.cos(G.skyYaw);
+      tmpV.set(px - fx * back, H, pz - fz * back); camera.position.lerp(tmpV, Math.min(1, dt * 5)); camera.lookAt(px, 0, pz); camera.fov = 50;
+    }
+    { const far = G.sky ? Math.max(G.baseFar || 2500, G.skyH * 5 + 800) : (G.baseFar || 2500); if (camera.far !== far) camera.far = far; }
     if (G.camOverride) G.camOverride(camera);
     camera.updateProjectionMatrix(); camera.getWorldDirection(camFwd);
     // shadows follow the player
@@ -516,8 +538,9 @@ async function main() {
     sky.position.copy(camera.position);
     waterNormals.offset.set(G.time * 0.004, G.time * 0.0025);
     // vehicles, people
-    fleet.update(cars, CF, MAXCARS, pcarIdx, camera.position, dt, G.night, cockpit);
-    crowd.fwd = [camFwd.x, camFwd.z]; crowd.update(peds, PF, MAXPEDS, camera.position, dt);
+    const focus = G.sky ? tmpV.set(px, 2, pz) : camera.position;
+    fleet.update(cars, CF, MAXCARS, pcarIdx, focus, dt, G.night, cockpit);
+    crowd.fwd = G.sky ? null : [camFwd.x, camFwd.z]; crowd.update(peds, PF, MAXPEDS, focus, dt);
     me.obj.visible = !inCar; if (!inCar) { me.obj.position.set(pl[0], 0, pl[1]); me.obj.rotation.y = pl[2]; Crowd.blend(me, pl[3], dt); }
     // owned vehicle markers
     let n = 0; const m4 = new THREE.Matrix4();
@@ -567,7 +590,7 @@ async function main() {
     }
     G.frameN = (G.frameN | 0) + 1;
     // hide far-away detail (parked bikes, poles, wires, trees, roof tanks): at a distance it is a few pixels of work for nothing
-    if (G.frameN % 8 === 1) { const cx = camera.position.x, cz = camera.position.z, k = Q.lod; for (const l of city.lod) l.o.visible = Math.hypot(l.x - cx, l.z - cz) - l.r < LODR[l.kind] * k; } if (Q.shadow) renderer.shadowMap.needsUpdate = G.frameN % Q.shadow === 0;
+    if (G.frameN % 8 === 1) { const cx = G.sky ? G.px : camera.position.x, cz = G.sky ? G.pz : camera.position.z, k = Q.lod * (G.sky ? Math.max(1, Math.min(2.5, G.skyH / 250)) : 1); for (const l of city.lod) l.o.visible = Math.hypot(l.x - cx, l.z - cz) - l.r < LODR[l.kind] * k; } if (Q.shadow) renderer.shadowMap.needsUpdate = G.frameN % Q.shadow === 0;
     const tA = performance.now(); P.pre += tA - P.t0;
     renderer.render(scene, camera); const tB = performance.now(); P.gl += tB - tA;
     drawHud(); P.hud += performance.now() - tB; P.n++;
@@ -579,7 +602,8 @@ async function main() {
   function panel(x, y, w, h) { rrect(x, y, w, h, 10 * D2); ctx.fillStyle = 'rgba(12,14,18,0.62)'; ctx.fill(); }
   function wrap(text, maxW) { const words = text.split(' '), lines = []; let cur = ''; for (const w of words) { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; } if (cur) lines.push(cur); return lines; }
   function drawHud() {
-    const w = hud.width, h = hud.height; D2 = Math.min(devicePixelRatio || 1, 2) * Math.min(1, Math.max(0.7, innerWidth / 1100)); const D = D2;
+    const w = hud.width, h = hud.height; const U = Math.min(devicePixelRatio || 1, 2), narrow = innerWidth < 560; D2 = U * (TOUCH ? (innerWidth < 350 ? 0.76 : 0.86) : Math.min(1, Math.max(0.7, innerWidth / 1100))); const D = D2;
+    { const st = (G.paused ? 0 : 1) | (G.offers || G.bigMap || G.help ? 2 : 0) | (G.job ? 4 : 0); if (st !== G._bodySt) { G._bodySt = st; const c = document.body.classList; c.toggle('modal', !!(st & 2)); c.toggle('job', !!(st & 4)); } }
     ctx.clearRect(0, 0, w, h); if (G.paused) return;
     const font = (s, b = 600) => `${b} ${Math.round(s * D)}px "Segoe UI", system-ui, sans-serif`;
     const px = G.px, pz = G.pz;
@@ -591,7 +615,7 @@ async function main() {
     ctx.fillStyle = '#f2cc60'; ctx.font = font(14, 600); ctx.fillText(G.trips ? `${(G.ratingSum / G.trips).toFixed(1)}★ · ${G.trips} trips` : 'No trips yet', 120 * D, 57 * D);
     const J = G.job;
     if (G.offers) {
-      const pw = Math.min(600 * D, w - 40 * D), x0 = (w - pw) / 2; let y = 70 * D;
+      let pw = Math.min(600 * D, w - 40 * D), x0 = (w - pw) / 2, y = 70 * D; if (TOUCH && narrow) { y = 280 * U; x0 = 10 * D; pw = w - 20 * D; } else if (TOUCH) { y = 16 * D; x0 = Math.max(x0, 236 * D); pw = Math.min(pw, w - x0 - 10 * D); }
       const small = h < 560 * D; ctx.font = font(14, 500); const blocks = G.offers.map(o => small ? [] : wrap(o.text, pw - 40 * D).slice(0, 2));
       const rowH = b => (b.length * 18 + (small ? 30 : 36)) * D, goalsH = small ? 26 * D : (GOALS.length * 18 + 30) * D, ph = 50 * D + blocks.reduce((a, b) => a + rowH(b), 0) + goalsH;
       panel(x0, y, pw, ph); ctx.fillStyle = '#fff'; ctx.font = font(18, 700); ctx.fillText(document.body.classList.contains('touch') ? 'Jobs near you: tap one to accept' : `Jobs near you: press 1 to ${G.offers.length}, or click one`, x0 + 20 * D, y + 14 * D); y += 46 * D; G.offerRects = [];
@@ -604,18 +628,19 @@ async function main() {
         for (const [id, need, text, reward] of GOALS) { const v = Math.min(need, Math.round(G.gv[id] || 0)), ok = !!G.claimed[id]; ctx.fillStyle = ok ? '#7ee787' : '#c9d1d9'; ctx.fillText(`${ok ? '✓' : '○'} ${text} (${id === 'earned' ? '₹' + v : v}/${id === 'earned' ? '₹' + need : need}) · bonus ₹${reward}`, x0 + 20 * D, y, pw - 40 * D); y += 18 * D; } }
     } else if (J) {
       const tgt = J.stage === 'pickup' ? J.from : J.to; let pw = Math.min(540 * D, w - 40 * D), x0 = (w - pw) / 2; if (x0 < 236 * D) { x0 = 236 * D; pw = Math.max(200 * D, w - 250 * D); }
+      const jy = TOUCH && narrow ? 86 * D : 0; if (jy) { x0 = 14 * D; pw = w - 28 * D; } ctx.save(); ctx.translate(0, jy);
       panel(x0, 14 * D, pw, 60 * D); ctx.fillStyle = '#fff'; ctx.font = font(15, 700);
       { const lastS = J.si === J.stops.length - 1, k = J.kind, verb = J.stage === 'pickup' ? (J.challenge ? 'Start at' : 'Pick up at') : J.challenge ? (lastS ? 'Finish at' : 'Checkpoint:') : k === 'share' ? (lastS ? 'Drop everyone at' : 'Next pickup:') : k === 'tour' ? 'Tour stop:' : /^(ride|school|hospital)$/.test(k) ? 'Drop passenger at' : 'Deliver to'; ctx.fillStyle = J.col; ctx.fillText(`${J.label.replace('Challenge: ', '')} · ${verb} ${tgt.name}`, x0 + 16 * D, 24 * D, pw - 32 * D); }
       ctx.font = font(13, 500); ctx.fillStyle = '#c9d1d9'; const d = (G.routeLeft > 0 ? G.routeLeft : Math.hypot(tgt.stop.x - px, tgt.stop.z - pz)) / 1000, left = J.limit - J.t;
-      ctx.fillText(`${d < 1 ? Math.round(d * 100) * 10 + ' m' : d.toFixed(1) + ' km'} by road${J.stage === 'carry' ? ` · ${left > 0 ? Math.ceil(left) + 's left' : 'running late'} · ${J.kind === 'test' ? 'faults ' + J.faults + '/2' : J.kind === 'fragile' ? 'cargo ' + Math.round(J.cargo) + '%' : J.kind === 'clean' ? 'no scratches so far' : J.rating.toFixed(1) + '★'}${J.stops.length > 2 ? ' · stop ' + J.si + ' of ' + (J.stops.length - 1) : ''}` : ''} · X to cancel`, x0 + 16 * D, 48 * D, pw - 32 * D);
-    } else { ctx.font = font(13, 500); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.textAlign = 'center'; ctx.fillText('J jobs · M map · V driver view · P graphics · T skip hour · R rain · ? help', w / 2, 20 * D); ctx.textAlign = 'left'; }
+      ctx.fillText(`${d < 1 ? Math.round(d * 100) * 10 + ' m' : d.toFixed(1) + ' km'} by road${J.stage === 'carry' ? ` · ${left > 0 ? Math.ceil(left) + 's left' : 'running late'} · ${J.kind === 'test' ? 'faults ' + J.faults + '/2' : J.kind === 'fragile' ? 'cargo ' + Math.round(J.cargo) + '%' : J.kind === 'clean' ? 'no scratches so far' : J.rating.toFixed(1) + '★'}${J.stops.length > 2 ? ' · stop ' + J.si + ' of ' + (J.stops.length - 1) : ''}` : ''} ${TOUCH ? '' : ' · X to cancel'}`, x0 + 16 * D, 48 * D, pw - 32 * D); ctx.restore();
+    } else if (!TOUCH) { ctx.font = font(13, 500); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.textAlign = 'center'; ctx.fillText('J jobs · M map · V driver view · Z from above · P graphics · T skip hour · R rain · ? help', w / 2, 20 * D); ctx.textAlign = 'left'; }
     G.msg = G.msg.filter(m => m.until > G.time);
-    let my = h - (pcarIdx >= 0 ? 200 : 110) * D - G.msg.length * 36 * D; ctx.textAlign = 'center';
-    for (const m of G.msg) { ctx.font = font(15, 600); const tw = ctx.measureText(m.t).width + 28 * D; panel(w / 2 - tw / 2, my, tw, 30 * D); ctx.fillStyle = '#fff'; ctx.fillText(m.t, w / 2, my + 7 * D); my += 36 * D; }
-    if (G.areaT > 0 && !G.offers && !G.help && !G.bigMap) { ctx.globalAlpha = Math.min(1, G.areaT); ctx.font = font(34, 800); ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 8 * D; ctx.fillText(G.area, w / 2, h * 0.16); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
+    let my = TOUCH && !narrow ? 142 * U : (TOUCH ? h - 236 * U : h - (pcarIdx >= 0 ? 200 : 110) * D) - G.msg.length * 36 * D; ctx.textAlign = 'center';
+    for (const m of G.msg) { ctx.font = font(15, 600); const tw = Math.min(ctx.measureText(m.t).width + 28 * D, w - 12 * D); panel(w / 2 - tw / 2, my, tw, 30 * D); ctx.fillStyle = '#fff'; ctx.fillText(m.t, w / 2, my + 7 * D, tw - 16 * D); my += 36 * D; }
+    if (G.areaT > 0 && !G.offers && !G.help && !G.bigMap) { ctx.globalAlpha = Math.min(1, G.areaT); ctx.font = font(34, 800); ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 8 * D; ctx.fillText(G.area, w / 2, h * (TOUCH ? 0.4 : 0.16)); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
     ctx.textAlign = 'left';
     // minimap
-    const ms = Math.min(230 * D, w * 0.32), mx = 16 * D, my2 = h - ms - 16 * D;
+    const ms = TOUCH ? 118 * U : Math.min(230 * D, w * 0.32), mx = TOUCH ? 12 * U : 16 * D, my2 = TOUCH ? (narrow ? 150 : 88) * U : h - ms - 16 * D;
     ctx.save(); rrect(mx, my2, ms, ms, 14 * D); ctx.clip(); ctx.fillStyle = '#2b2f2a'; ctx.fillRect(mx, my2, ms, ms);
     const zoom = (Math.abs(G.pspd) > 12 ? 1.5 : 2.1) * D; const rotA = G.camYaw + G.orbit + Math.PI;
     ctx.translate(mx + ms / 2, my2 + ms / 2); ctx.rotate(rotA); ctx.scale(zoom, zoom); ctx.translate(-MX(px), -MZ(pz)); ctx.drawImage(mapCv, 0, 0);
@@ -635,18 +660,18 @@ async function main() {
     }
     ctx.save(); ctx.translate(mx + ms / 2, my2 + ms / 2); ctx.rotate(-(G.ph - (G.camYaw + G.orbit))); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5 * D; ctx.beginPath(); ctx.moveTo(0, -9 * D); ctx.lineTo(6 * D, 7 * D); ctx.lineTo(0, 3 * D); ctx.lineTo(-6 * D, 7 * D); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
     { const r = ms / 2 - 12 * D, rx = Math.sin(rotA), ry = -Math.cos(rotA), cx = mx + ms / 2 + rx * r, cy = my2 + ms / 2 + ry * r; ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.arc(cx, cy, 9 * D, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = font(11, 800); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('N', cx, cy + 0.5); ctx.textAlign = 'left'; ctx.textBaseline = 'top'; }
-    ctx.font = font(13, 700); ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4 * D; ctx.fillText(`${G.road ? G.road + ', ' : ''}${G.area}`, mx + ms + 12 * D, h - 30 * D); ctx.shadowBlur = 0;
+    ctx.font = font(13, 700); ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4 * D; if (TOUCH) { ctx.textAlign = 'center'; ctx.fillText(`${G.road ? G.road + ', ' : ''}${G.area}`, w / 2, h - 24 * U, w - 20 * U); ctx.textAlign = 'left'; } else ctx.fillText(`${G.road ? G.road + ', ' : ''}${G.area}`, mx + ms + 12 * D, h - 30 * D); ctx.shadowBlur = 0;
     if (pcarIdx >= 0) {
-      const o = pcarIdx * CF, kmh = Math.abs(cars[o + 12]) * 3.6, dmg = cars[o + 13], cx = w - 92 * D, cy = h - 92 * D, r = 70 * D;
+      const o = pcarIdx * CF, kmh = Math.abs(cars[o + 12]) * 3.6, dmg = cars[o + 13], cx = TOUCH ? w - 64 * U : w - 92 * D, cy = TOUCH ? h - 68 * U : h - 92 * D, r = TOUCH ? 46 * U : 70 * D;
       ctx.beginPath(); ctx.arc(cx, cy, r + 10 * D, 0, 7); ctx.fillStyle = 'rgba(12,14,18,0.6)'; ctx.fill();
       const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25; ctx.lineWidth = 6 * D; ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.arc(cx, cy, r - 4 * D, a0, a1); ctx.stroke();
       ctx.strokeStyle = kmh > 50 ? '#ff7b72' : '#58a6ff'; ctx.beginPath(); ctx.arc(cx, cy, r - 4 * D, a0, a0 + (a1 - a0) * Math.min(1, kmh / 120)); ctx.stroke();
-      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = font(32, 800); ctx.fillText(Math.round(kmh), cx, cy - 22 * D); ctx.font = font(12, 600); ctx.fillStyle = '#c9d1d9'; ctx.fillText('km/h', cx, cy + 14 * D); ctx.fillText(kmh > 50 ? 'Limit 50' : '', cx, cy + 30 * D);
-      ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(cx - 40 * D, cy + 48 * D, 80 * D, 6 * D); ctx.fillStyle = dmg > 70 ? '#ff7b72' : dmg > 35 ? '#f2cc60' : '#56d364'; ctx.fillRect(cx - 40 * D, cy + 48 * D, 80 * D * (1 - dmg / 100), 6 * D); ctx.textAlign = 'left';
-      if (dmg > 35) { const m = dmg >= 100 ? 'Vehicle badly damaged and crawling. Stop and press G (FIX) to repair it.' : 'Vehicle damaged. Stop and press G (FIX) for a mechanic.'; ctx.font = font(14, 700); ctx.textAlign = 'center'; const tw = ctx.measureText(m).width + 28 * D; panel(w / 2 - tw / 2, 82 * D, tw, 30 * D); ctx.fillStyle = dmg >= 100 ? '#ff7b72' : '#f2cc60'; ctx.fillText(m, w / 2, 89 * D); ctx.textAlign = 'left'; }
-    } else for (const ov of G.owned) { const c = ov.i * CF; if (cars[c + 7] && Math.hypot(cars[c] - px, cars[c + 1] - pz) < cars[c + 14] + 2) { ctx.font = font(15, 700); ctx.textAlign = 'center'; panel(w / 2 - 150 * D, h * 0.64, 300 * D, 34 * D); ctx.fillStyle = '#fff'; ctx.fillText(`Press F to get in your ${ov.name}`, w / 2, h * 0.64 + 9 * D); ctx.textAlign = 'left'; } }
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = font(32, 800); ctx.fillText(Math.round(kmh), cx, cy - 22 * D); ctx.font = font(12, 600); ctx.fillStyle = '#c9d1d9'; ctx.fillText('km/h', cx, cy + 14 * D); if (!TOUCH) ctx.fillText(kmh > 50 ? 'Limit 50' : '', cx, cy + 30 * D);
+      ctx.fillStyle = 'rgba(255,255,255,0.2)'; const by = TOUCH ? cy + 34 * D : cy + 48 * D; ctx.fillRect(cx - 40 * D, by, 80 * D, 6 * D); ctx.fillStyle = dmg > 70 ? '#ff7b72' : dmg > 35 ? '#f2cc60' : '#56d364'; ctx.fillRect(cx - 40 * D, by, 80 * D * (1 - dmg / 100), 6 * D); ctx.textAlign = 'left';
+      if (dmg > 35) { const m = dmg >= 100 ? (TOUCH ? 'Vehicle badly damaged. Stop and tap FIX.' : 'Vehicle badly damaged and crawling. Stop and press G (FIX) to repair it.') : TOUCH ? 'Vehicle damaged. Stop and tap FIX.' : 'Vehicle damaged. Stop and press G (FIX) for a mechanic.'; ctx.font = font(14, 700); ctx.textAlign = 'center'; const tw = Math.min(ctx.measureText(m).width + 28 * D, w - 12 * D), wy = TOUCH ? h * 0.42 : 82 * D; panel(w / 2 - tw / 2, wy, tw, 30 * D); ctx.fillStyle = dmg >= 100 ? '#ff7b72' : '#f2cc60'; ctx.fillText(m, w / 2, wy + 7 * D, tw - 16 * D); ctx.textAlign = 'left'; }
+    } else for (const ov of G.owned) { const c = ov.i * CF; if (cars[c + 7] && Math.hypot(cars[c] - px, cars[c + 1] - pz) < cars[c + 14] + 2) { ctx.font = font(15, 700); ctx.textAlign = 'center'; panel(w / 2 - 150 * D, h * 0.64, 300 * D, 34 * D); ctx.fillStyle = '#fff'; ctx.fillText(TOUCH ? `Tap IN/OUT to get in your ${ov.name}` : `Press F to get in your ${ov.name}`, w / 2, h * 0.64 + 9 * D); ctx.textAlign = 'left'; } }
     if (G.help) {
-      const lines = ['W/S or ↑/↓ accelerate and brake/reverse, A/D steer, Space handbrake, H horn', 'F get in or out of your vehicle. Traffic keeps LEFT, as in Chennai', 'On foot: WASD walk, Shift to jog, Q/E turn the camera', 'J job list · X cancel job · M city map · V driver view', 'P graphics: Battery saver, Balanced or High. Lower settings keep a laptop cool', 'G mechanic: stop and press G to repair a damaged vehicle (costs money)', 'T skip one hour (try night) · R monsoon rain · drag to look around, wheel to zoom', 'Cyan markers are your vehicles: auto, scooter, hatchback and taxi', 'Map data © OpenStreetMap contributors (ODbL)'];
+      const lines = ['W/S or ↑/↓ accelerate and brake/reverse, A/D steer, Space handbrake, H horn', 'F get in or out of your vehicle. Traffic keeps LEFT, as in Chennai', 'On foot: WASD walk, Shift to jog, Q/E turn the camera', 'J job list · X cancel job · M city map · V driver view', 'P graphics: Battery saver, Balanced or High. Lower settings keep a laptop cool', 'G mechanic: stop and press G to repair a damaged vehicle (costs money)', 'T skip one hour (try night) · R monsoon rain · drag to look around, wheel to zoom', 'Z view from above in 3D: wheel or pinch to zoom, drag to turn. Zooming far out also lifts you up', 'Cyan markers are your vehicles: auto, scooter, hatchback and taxi', 'Map data © OpenStreetMap contributors (ODbL)'];
       ctx.font = font(14, 500); const pw = Math.min(720 * D, w - 40 * D), ph = (lines.length * 22 + 50) * D, x0 = (w - pw) / 2, y0 = h * 0.22;
       panel(x0, y0, pw, ph); ctx.fillStyle = '#fff'; ctx.font = font(17, 700); ctx.fillText('Controls', x0 + 18 * D, y0 + 14 * D); ctx.font = font(14, 500); ctx.fillStyle = '#d0d7de'; lines.forEach((l, i) => ctx.fillText(l, x0 + 18 * D, y0 + (44 + i * 22) * D));
     }
@@ -669,7 +694,7 @@ async function main() {
         ctx.fillStyle = 'rgba(10,14,20,0.92)'; rrect(lx - tw / 2, ly, tw, 26 * D, 8 * D); ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1.5 * D; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.fillText(label, lx, ly + 5 * D); ctx.font = font(11, 700);
       }
       ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bx(px), bz(pz), 6 * D, 0, 7); ctx.fill(); ctx.strokeStyle = '#f00'; ctx.lineWidth = 2 * D; ctx.stroke();
-      ctx.font = font(13, 600); ctx.fillStyle = '#ddd'; ctx.fillText(`Real street map of ${MAP.title} (OpenStreetMap). Press ` + 'M to close.', w / 2, Math.max(8 * D, y0 - 22 * D)); ctx.textAlign = 'left';
+      ctx.font = font(13, 600); ctx.fillStyle = '#ddd'; ctx.fillText(TOUCH ? 'Real street map (OpenStreetMap). Tap to close.' : `Real street map of ${MAP.title} (OpenStreetMap). Press ` + 'M to close.', w / 2, Math.max(8 * D, y0 - 22 * D), w - 16 * D); ctx.textAlign = 'left';
     }
     ctx.font = font(10, 500); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.textAlign = 'right'; ctx.fillText(`${fps.toFixed(0)} fps · © OpenStreetMap contributors`, w - 8 * D, 8 * D); ctx.textAlign = 'left';
   }
@@ -685,12 +710,12 @@ async function main() {
     qIdx = i; Q = QUAL[i]; qLevel = 0; slowT = 0; G.quality = Q.name;
     renderer.setPixelRatio(Math.min(devicePixelRatio, Q.pr)); resize();
     sun.castShadow = Q.shadow > 0; renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
-    camera.far = Q.far; camera.updateProjectionMatrix(); if (scene.fog) scene.fog.density = Q.fog; G.fogBase = Q.fog;
+    camera.far = Q.far; camera.updateProjectionMatrix(); if (scene.fog) scene.fog.density = Q.fog; G.fogBase = Q.fog; G.baseFar = Q.far;
     crowd.maxShow = Q.ppl; crowd.range = Q.pplR; crowd.shadowN = Q.pplSh; fleet.range = Q.veh;
     try { localStorage.setItem('madras-streets-quality', String(i)); } catch (e) {}
     if (!quiet) toast(`Graphics: ${Q.name} (${Q.fps} frames a second). Press P to change.`, 4);
   }
-  { let i = 1; try { const v = localStorage.getItem('madras-streets-quality'); if (v !== null && QUAL[+v]) i = +v; } catch (e) {} applyQuality(i, true); }
+  { let i = TOUCH ? 0 : 1; try { const v = localStorage.getItem('madras-streets-quality'); if (v !== null && QUAL[+v]) i = +v; } catch (e) {} applyQuality(i, true); }
   G.cycleQuality = () => applyQuality((qIdx + 1) % QUAL.length);
   renderer.setAnimationLoop(() => {
     // frame cap: 30 a second on Balanced, 60 on High. Drawing faster only makes heat.
@@ -700,7 +725,7 @@ async function main() {
     if (!G.paused && !G.noAdapt) { slowT = fps < Math.min(24, Q.fps * 0.8) ? slowT + raw : 0; if (slowT > 2.5 && qLevel < 3) { qLevel++; slowT = 0; G.qLevel = qLevel;
       if (qLevel === 1) { sun.castShadow = false; renderer.shadowMap.needsUpdate = true; Q = { ...Q, shadow: 0 }; }
       if (qLevel === 2) { renderer.setPixelRatio(Math.min(devicePixelRatio, Q.pr * 0.75)); resize(); }
-      if (qLevel === 3) { camera.far = Math.min(camera.far, 1500); camera.updateProjectionMatrix(); crowd.maxShow = 12; }
+      if (qLevel === 3) { G.baseFar = Math.min(G.baseFar, 1500); crowd.maxShow = 12; }
       } }
     // game time keeps real speed on a slow machine: up to 0.15 s per frame, simulated in steps of 0.05 s
     let rem = Math.min(0.15, raw);
