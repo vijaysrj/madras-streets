@@ -269,26 +269,35 @@ async function main() {
     // tap or click a job in the list to accept it
     if (G.offers && G.offerRects) { const hx = e.clientX * hud.width / innerWidth, hy = e.clientY * hud.height / innerHeight; const k = G.offerRects.findIndex(r => hx >= r[0] && hx <= r[2] && hy >= r[1] && hy <= r[3]); if (k >= 0) { acceptOffer(k); return; } }
     if (e.pointerType !== 'mouse' && (G.offers || G.bigMap || G.help)) { G.offers = null; G.bigMap = false; G.help = false; return; }
-    pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinch = 0;
+    if (e.isPrimary) pts.clear(); // drop any finger whose lift was missed
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinch = 0; pinch0 = 0;
     drag = pts.size === 1 ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
   });
-  const pts = new Map(); let pinch = 0;
-  const ptUp = e => { pts.delete(e.pointerId); pinch = 0; drag = null; };
+  const pts = new Map(); let pinch = 0, pinch0 = 0;
+  const ptUp = e => { pts.delete(e.pointerId); pinch = 0; pinch0 = 0; drag = null; };
   addEventListener('pointerup', ptUp); addEventListener('pointercancel', ptUp);
   // zoom: wheel or pinch. Zooming out past the chase camera lifts into the view from above; zooming in comes back down.
   function zoomBy(f) {
     if (G.sky) G.skyH = Math.max(3, Math.min(12000, G.skyH * f));
-    else { const d = G.camDist * f; if (d > 34 && G.view === 0) { G.sky = true; G.skyH = 26; G.skyYaw = G.camYaw + G.orbit; } G.camDist = Math.max(2.2, Math.min(30, d)); }
+    else G.camDist = Math.max(2.2, Math.min(30, G.camDist * f)); // the view from above is entered only with Z or the SKY button, never by zooming
   }
   addEventListener('pointermove', e => {
     if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch > 0 && d > 0) zoomBy(Math.max(0.8, Math.min(1.25, pinch / d))); pinch = d; return; }
+    if (pts.size >= 2) {
+      // pinch zoom works only in the view from above, and only after a clear pinch, so two thumbs on the screen while driving never change the zoom
+      if (!G.sky || pts.size > 2) return; const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (!pinch0) pinch0 = d;
+      if (pinch > 0 && d > 0) zoomBy(Math.max(0.8, Math.min(1.25, pinch / d))); if (pinch > 0 || Math.abs(d - pinch0) > 24) pinch = d; return; }
     if (drag && drag.id === e.pointerId) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       if (G.sky) { G.skyYaw += dx * 0.006; G.skyTilt = Math.max(0.12, Math.min(1.45, G.skyTilt + dy * 0.004)); }
       else { G.orbit += dx * 0.006; G.camPitch = Math.max(0.03, Math.min(1.2, G.camPitch + dy * 0.004)); G.orbitT = 3; }
       drag.x = e.clientX; drag.y = e.clientY; } });
   canvas.addEventListener('wheel', e => { zoomBy(e.deltaY > 0 ? 1.1 : 0.9); e.preventDefault(); }, { passive: false });
   addEventListener('contextmenu', e => e.preventDefault());
+  // Phones: stop the browser's own page zoom (double tap, pinch) from firing on fast taps of GO, BRAKE or the arrows while riding.
+  // The game reads pointer events, which still arrive.
+  { const stop = e => { if (document.body.classList.contains('playing')) e.preventDefault(); }, o = { passive: false };
+    for (const t of ['touchstart', 'touchmove', 'touchend', 'gesturestart', 'gesturechange', 'gestureend', 'dblclick']) document.addEventListener(t, stop, o);
+    if (window.visualViewport) visualViewport.addEventListener('resize', () => { if (visualViewport.scale > 1.01) { const m = document.querySelector('meta[name=viewport]'); if (m) { const c = m.content; m.content = c + ', minimum-scale=1'; m.content = c; } } }); }
   document.querySelectorAll('[data-key]').forEach(b => { const k = b.dataset.key; b.addEventListener('pointerdown', e => { e.preventDefault(); if (!keys[k]) pressed[k] = true; keys[k] = true; b.classList.add('on'); }); const up = () => { keys[k] = false; b.classList.remove('on'); }; b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up); });
   { const mb = $('menuB'), tb = $('tbar'); if (mb) { mb.addEventListener('pointerdown', e => { e.preventDefault(); document.body.classList.toggle('menu'); }); tb.addEventListener('pointerup', () => document.body.classList.remove('menu')); canvas.addEventListener('pointerdown', () => document.body.classList.remove('menu')); } }
   const TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 && matchMedia('(hover: none)').matches; if (TOUCH) document.body.classList.add('touch');
@@ -527,7 +536,8 @@ async function main() {
       tmpV.set(px - fx * dist * Math.cos(cp), hgt + dist * Math.sin(cp), pz - fz * dist * Math.cos(cp));
       camera.position.lerp(tmpV, Math.min(1, dt * 10)); camera.position.y = Math.max(0.5, camera.position.y);
       camera.lookAt(px + fx * 2, hgt, pz + fz * 2);
-      camera.fov = 60 + Math.min(12, Math.abs(G.pspd) * 0.4);
+      // the view widens gently with speed; eased so a sudden stop or bump does not snap the picture closer
+      { const want = 60 + Math.min(8, Math.abs(G.pspd) * 0.3); camera.fov += (want - camera.fov) * Math.min(1, dt * 0.8); }
     }
     if (G.sky) {
       const H = G.skyH, back = H / Math.tan(G.skyTilt), fx = Math.sin(G.skyYaw), fz = Math.cos(G.skyYaw);
