@@ -529,7 +529,9 @@ async function main() {
       const H = G.skyH, back = H / Math.tan(G.skyTilt), fx = Math.sin(G.skyYaw), fz = Math.cos(G.skyYaw);
       tmpV.set(px - fx * back, H, pz - fz * back); camera.position.lerp(tmpV, Math.min(1, dt * 5)); camera.lookAt(px, 0, pz); camera.fov = 50;
     }
-    { const far = G.sky ? Math.max(G.baseFar || 2500, G.skyH * 5 + 800) : (G.baseFar || 2500); if (camera.far !== far) camera.far = far; }
+    { const far = G.sky ? Math.max(G.baseFar || 2500, G.skyH * 5 + 800) : (G.baseFar || 2500); if (camera.far !== far) camera.far = far;
+      // from high up the ground layers are too close together for the depth buffer unless the near limit moves out with the height
+      camera.near = G.sky ? Math.max(0.3, camera.position.y * 0.12) : 0.3; }
     if (G.camOverride) G.camOverride(camera);
     camera.updateProjectionMatrix(); camera.getWorldDirection(camFwd);
     // shadows follow the player
