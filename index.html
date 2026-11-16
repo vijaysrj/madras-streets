@@ -33,11 +33,12 @@
   #touch .b { position: fixed; z-index: 10; width: 74px; height: 74px; border-radius: 50%; background: rgba(20,24,30,0.5); border: 2px solid rgba(255,255,255,0.35); color: #fff; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; touch-action: none; }
   #touch .b.on { background: rgba(242,179,33,0.65); }
   #touch .s { width: 56px; height: 56px; font-size: 12px; }
-  #tbar { position: fixed; z-index: 10; top: 150px; right: calc(8px + env(safe-area-inset-right)); display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: min(232px, calc(100vw - 150px)); }
-  #tbar .b { position: static; box-sizing: border-box; width: 52px; height: 52px; border-radius: 14px; font-size: 11px; letter-spacing: 0.3px; }
+  #menuB { right: calc(8px + env(safe-area-inset-right)); top: calc(8px + env(safe-area-inset-top)); width: 44px !important; height: 34px !important; border-radius: 10px !important; font-size: 18px !important; background: rgba(20,24,30,0.4) !important; border-width: 1px !important; }
+  #tbar { position: fixed; z-index: 11; top: calc(48px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); display: none; grid-template-columns: repeat(4, 54px); gap: 6px; padding: 8px; border-radius: 14px; background: rgba(12,14,18,0.78); }
+  body.menu #tbar { display: grid; }
+  #tbar .b { position: static; box-sizing: border-box; width: 54px; height: 50px; border-radius: 12px; font-size: 11px; letter-spacing: 0.3px; }
   body:not(.job) #tbar .jobonly { display: none; }
   @media (orientation: landscape) and (max-height: 520px) { #hornB { left: calc(188px + env(safe-area-inset-left)) !important; bottom: 48px !important; } }
-  @media (min-width: 560px) { #tbar { top: 84px; max-width: none; flex-wrap: nowrap; } #tbar .b { width: 48px; height: 48px; } }
   #title .sub { font-size: 13px; color: #8f9aa6; margin-top: 14px; }
   #loading .bar { width: min(360px, 80vw); height: 4px; background: #222a35; border-radius: 4px; overflow: hidden; }
   #loading .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
@@ -62,8 +63,9 @@
   <div class="b s" id="hornB" data-key="KeyH" style="left:calc(14px + env(safe-area-inset-left));bottom:126px">HORN</div>
   <div class="b" data-key="KeyW" style="right:calc(14px + env(safe-area-inset-right));bottom:124px">GO</div>
   <div class="b" data-key="KeyS" style="right:calc(134px + env(safe-area-inset-right));bottom:30px;font-size:13px">BRAKE</div>
+  <div class="b s" data-key="KeyF" style="right:calc(22px + env(safe-area-inset-right));bottom:210px;font-size:11px">IN/OUT</div>
+  <div class="b" id="menuB">☰</div>
   <div id="tbar">
-    <div class="b" data-key="KeyF">IN/OUT</div>
     <div class="b" data-key="KeyJ">JOBS</div>
     <div class="b" data-key="KeyM">MAP</div>
     <div class="b" data-key="KeyZ">SKY</div>

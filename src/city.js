@@ -52,7 +52,10 @@ export function buildCity(D, scene, opts = {}) {
     group.add(mesh(polyGeom([poly], 0), M.ground, { receive: true }));
   }
   // open land far beyond the mapped area, so the view from high above has no hard edge
-  { const F = 40000; const far = mesh(polyGeom([[[-F, -F], [F, -F], [F, F], [-F, F]]], -0.6), M.ground, { receive: false }); far.name = 'farland'; group.add(far); }
+  // (built from many cells that are small near the map: one giant triangle loses depth precision close to the camera)
+  { const F = 40000, N = 12, c = []; for (let i = -N; i <= N; i++) c.push(F * (i / N) ** 3); const cells = [];
+    for (let i = 0; i < c.length - 1; i++) for (let j = 0; j < c.length - 1; j++) cells.push([[c[i], c[j]], [c[i + 1], c[j]], [c[i + 1], c[j + 1]], [c[i], c[j + 1]]]);
+    const far = mesh(polyGeom(cells, -0.6), M.ground, { receive: false }); far.name = 'farland'; group.add(far); }
   // land-use patches
   const byKind = {};
   for (const a of D.areas) if (a.poly && a.poly.length >= 3) (byKind[a.kind] = byKind[a.kind] || []).push(a.poly);

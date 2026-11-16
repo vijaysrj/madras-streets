@@ -60,7 +60,10 @@ async function main() {
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000), new THREE.MeshStandardMaterial({ color: 0x1d4a5c, roughness: 0.14, metalness: 0.55, normalMap: waterNormals, normalScale: new THREE.Vector2(0.9, 0.9) }));
   sea.material.userData.envK = 2.2; sea.material.envMapIntensity = 2.2; sea.receiveShadow = true;
   // the sea lies only east of the shoreline, never under the city, so it cannot show through the ground
-  { let xw = 1e9; for (let z = D.bounds.z0 - 400; z <= D.bounds.z1 + 400; z += 20) xw = Math.min(xw, city.coastX(z)); sea.geometry = new THREE.PlaneGeometry(80000, 80000); sea.position.x = xw - 40 + 40000; waterNormals.repeat.set(1733, 1733); }
+  { let xw = 1e9; for (let z = D.bounds.z0 - 400; z <= D.bounds.z1 + 400; z += 20) xw = Math.min(xw, city.coastX(z)); const g = new THREE.PlaneGeometry(80000, 80000, 32, 32), P = g.attributes.position, UV = g.attributes.uv;
+    // small cells near the shore and the map, large ones far out: giant triangles lose depth precision close to the camera
+    for (let i = 0; i < P.count; i++) { const tx = P.getX(i) / 80000 + 0.5, uy = P.getY(i) / 40000, X = 80000 * tx ** 3 - 40000, Y = 40000 * uy ** 3; P.setXY(i, X, Y); UV.setXY(i, X / 80000 + 0.5, Y / 80000 + 0.5); }
+    g.computeBoundingSphere(); sea.geometry = g; sea.position.x = xw - 40 + 40000; waterNormals.repeat.set(1733, 1733); }
   sea.rotation.x = -Math.PI / 2; sea.position.y = -0.3; scene.add(sea);
   for (const p of city.water.polys) { const g = polyGeom([p], 0.04); const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x35514a, roughness: 0.15, metalness: 0.1 })); m.receiveShadow = true; scene.add(m); }
   // surf line
@@ -287,6 +290,7 @@ async function main() {
   canvas.addEventListener('wheel', e => { zoomBy(e.deltaY > 0 ? 1.1 : 0.9); e.preventDefault(); }, { passive: false });
   addEventListener('contextmenu', e => e.preventDefault());
   document.querySelectorAll('[data-key]').forEach(b => { const k = b.dataset.key; b.addEventListener('pointerdown', e => { e.preventDefault(); if (!keys[k]) pressed[k] = true; keys[k] = true; b.classList.add('on'); }); const up = () => { keys[k] = false; b.classList.remove('on'); }; b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up); });
+  { const mb = $('menuB'), tb = $('tbar'); if (mb) { mb.addEventListener('pointerdown', e => { e.preventDefault(); document.body.classList.toggle('menu'); }); tb.addEventListener('pointerup', () => document.body.classList.remove('menu')); canvas.addEventListener('pointerdown', () => document.body.classList.remove('menu')); } }
   const TOUCH = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0 && matchMedia('(hover: none)').matches; if (TOUCH) document.body.classList.add('touch');
   let steerS = 0;
 
@@ -610,14 +614,20 @@ async function main() {
     const font = (s, b = 600) => `${b} ${Math.round(s * D)}px "Segoe UI", system-ui, sans-serif`;
     const px = G.px, pz = G.pz;
     ctx.textBaseline = 'top';
+    if (TOUCH) {
+      const sx = 102 * U, sw = w - sx - 60 * U; ctx.globalAlpha = 0.85; panel(sx, 8 * U, sw, 30 * U); ctx.globalAlpha = 1;
+      ctx.font = font(15, 700); ctx.fillStyle = '#7ee787'; const mt = '₹ ' + G.money.toLocaleString('en-IN'); ctx.fillText(mt, sx + 10 * U, 15 * U); const mw = ctx.measureText(mt).width;
+      ctx.font = font(12, 600); ctx.fillStyle = '#e6edf3'; ctx.fillText(clockStr() + (G.trips ? ` · ${(G.ratingSum / G.trips).toFixed(1)}★ · ${G.trips} trips` : ''), sx + 20 * U + mw, 17 * U, sw - mw - 30 * U);
+    } else {
     panel(14 * D, 14 * D, 210 * D, 78 * D);
     ctx.fillStyle = '#fff'; ctx.font = font(22, 700); ctx.fillText(clockStr(), 26 * D, 22 * D);
     ctx.font = font(13, 500); ctx.fillStyle = '#c9d1d9'; ctx.textAlign = 'right'; ctx.fillText(G.rain > 0.5 ? 'Rain 26°C' : G.night > 0.5 ? 'Night 25°C' : 'Humid 31°C', 212 * D, 28 * D); ctx.textAlign = 'left';
     ctx.font = font(18, 700); ctx.fillStyle = '#7ee787'; ctx.fillText('₹ ' + G.money.toLocaleString('en-IN'), 26 * D, 54 * D);
     ctx.fillStyle = '#f2cc60'; ctx.font = font(14, 600); ctx.fillText(G.trips ? `${(G.ratingSum / G.trips).toFixed(1)}★ · ${G.trips} trips` : 'No trips yet', 120 * D, 57 * D);
+    }
     const J = G.job;
     if (G.offers) {
-      let pw = Math.min(600 * D, w - 40 * D), x0 = (w - pw) / 2, y = 70 * D; if (TOUCH && narrow) { y = 280 * U; x0 = 10 * D; pw = w - 20 * D; } else if (TOUCH) { y = 16 * D; x0 = Math.max(x0, 236 * D); pw = Math.min(pw, w - x0 - 10 * D); }
+      let pw = Math.min(600 * D, w - 40 * D), x0 = (w - pw) / 2, y = 70 * D; if (TOUCH && narrow) { y = 104 * U; x0 = 10 * D; pw = w - 20 * D; } else if (TOUCH) { y = 44 * U; x0 = Math.max(x0, 102 * U); pw = Math.min(pw, w - x0 - 10 * D); }
       const small = h < 560 * D; ctx.font = font(14, 500); const blocks = G.offers.map(o => small ? [] : wrap(o.text, pw - 40 * D).slice(0, 2));
       const rowH = b => (b.length * 18 + (small ? 30 : 36)) * D, goalsH = small ? 26 * D : (GOALS.length * 18 + 30) * D, ph = 50 * D + blocks.reduce((a, b) => a + rowH(b), 0) + goalsH;
       panel(x0, y, pw, ph); ctx.fillStyle = '#fff'; ctx.font = font(18, 700); ctx.fillText(document.body.classList.contains('touch') ? 'Jobs near you: tap one to accept' : `Jobs near you: press 1 to ${G.offers.length}, or click one`, x0 + 20 * D, y + 14 * D); y += 46 * D; G.offerRects = [];
@@ -630,21 +640,21 @@ async function main() {
         for (const [id, need, text, reward] of GOALS) { const v = Math.min(need, Math.round(G.gv[id] || 0)), ok = !!G.claimed[id]; ctx.fillStyle = ok ? '#7ee787' : '#c9d1d9'; ctx.fillText(`${ok ? '✓' : '○'} ${text} (${id === 'earned' ? '₹' + v : v}/${id === 'earned' ? '₹' + need : need}) · bonus ₹${reward}`, x0 + 20 * D, y, pw - 40 * D); y += 18 * D; } }
     } else if (J) {
       const tgt = J.stage === 'pickup' ? J.from : J.to; let pw = Math.min(540 * D, w - 40 * D), x0 = (w - pw) / 2; if (x0 < 236 * D) { x0 = 236 * D; pw = Math.max(200 * D, w - 250 * D); }
-      const jy = TOUCH && narrow ? 86 * D : 0; if (jy) { x0 = 14 * D; pw = w - 28 * D; } ctx.save(); ctx.translate(0, jy);
+      const jy = TOUCH ? 42 * U - 14 * D : 0; if (TOUCH) { x0 = 102 * U; pw = w - 112 * U; ctx.globalAlpha = 0.9; } ctx.save(); ctx.translate(0, jy);
       panel(x0, 14 * D, pw, 60 * D); ctx.fillStyle = '#fff'; ctx.font = font(15, 700);
       { const lastS = J.si === J.stops.length - 1, k = J.kind, verb = J.stage === 'pickup' ? (J.challenge ? 'Start at' : 'Pick up at') : J.challenge ? (lastS ? 'Finish at' : 'Checkpoint:') : k === 'share' ? (lastS ? 'Drop everyone at' : 'Next pickup:') : k === 'tour' ? 'Tour stop:' : /^(ride|school|hospital)$/.test(k) ? 'Drop passenger at' : 'Deliver to'; ctx.fillStyle = J.col; ctx.fillText(`${J.label.replace('Challenge: ', '')} · ${verb} ${tgt.name}`, x0 + 16 * D, 24 * D, pw - 32 * D); }
       ctx.font = font(13, 500); ctx.fillStyle = '#c9d1d9'; const d = (G.routeLeft > 0 ? G.routeLeft : Math.hypot(tgt.stop.x - px, tgt.stop.z - pz)) / 1000, left = J.limit - J.t;
-      ctx.fillText(`${d < 1 ? Math.round(d * 100) * 10 + ' m' : d.toFixed(1) + ' km'} by road${J.stage === 'carry' ? ` · ${left > 0 ? Math.ceil(left) + 's left' : 'running late'} · ${J.kind === 'test' ? 'faults ' + J.faults + '/2' : J.kind === 'fragile' ? 'cargo ' + Math.round(J.cargo) + '%' : J.kind === 'clean' ? 'no scratches so far' : J.rating.toFixed(1) + '★'}${J.stops.length > 2 ? ' · stop ' + J.si + ' of ' + (J.stops.length - 1) : ''}` : ''} ${TOUCH ? '' : ' · X to cancel'}`, x0 + 16 * D, 48 * D, pw - 32 * D); ctx.restore();
+      ctx.fillText(`${d < 1 ? Math.round(d * 100) * 10 + ' m' : d.toFixed(1) + ' km'} by road${J.stage === 'carry' ? ` · ${left > 0 ? Math.ceil(left) + 's left' : 'running late'} · ${J.kind === 'test' ? 'faults ' + J.faults + '/2' : J.kind === 'fragile' ? 'cargo ' + Math.round(J.cargo) + '%' : J.kind === 'clean' ? 'no scratches so far' : J.rating.toFixed(1) + '★'}${J.stops.length > 2 ? ' · stop ' + J.si + ' of ' + (J.stops.length - 1) : ''}` : ''} ${TOUCH ? '' : ' · X to cancel'}`, x0 + 16 * D, 48 * D, pw - 32 * D); ctx.restore(); ctx.globalAlpha = 1;
     } else if (!TOUCH) { ctx.font = font(13, 500); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.textAlign = 'center'; ctx.fillText('J jobs · M map · V driver view · Z from above · P graphics · T skip hour · R rain · ? help', w / 2, 20 * D); ctx.textAlign = 'left'; }
     G.msg = G.msg.filter(m => m.until > G.time);
-    let my = TOUCH && !narrow ? 142 * U : (TOUCH ? h - 236 * U : h - (pcarIdx >= 0 ? 200 : 110) * D) - G.msg.length * 36 * D; ctx.textAlign = 'center';
+    let my = TOUCH && !narrow ? 104 * U : (TOUCH ? h - 236 * U : h - (pcarIdx >= 0 ? 200 : 110) * D) - G.msg.length * 36 * D; ctx.textAlign = 'center';
     for (const m of G.msg) { ctx.font = font(15, 600); const tw = Math.min(ctx.measureText(m.t).width + 28 * D, w - 12 * D); panel(w / 2 - tw / 2, my, tw, 30 * D); ctx.fillStyle = '#fff'; ctx.fillText(m.t, w / 2, my + 7 * D, tw - 16 * D); my += 36 * D; }
     if (G.areaT > 0 && !G.offers && !G.help && !G.bigMap) { ctx.globalAlpha = Math.min(1, G.areaT); ctx.font = font(34, 800); ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 8 * D; ctx.fillText(G.area, w / 2, h * (TOUCH ? 0.4 : 0.16)); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
     ctx.textAlign = 'left';
     // minimap
-    const ms = TOUCH ? 118 * U : Math.min(230 * D, w * 0.32), mx = TOUCH ? 12 * U : 16 * D, my2 = TOUCH ? (narrow ? 150 : 88) * U : h - ms - 16 * D;
+    const ms = TOUCH ? 86 * U : Math.min(230 * D, w * 0.32), mx = TOUCH ? 8 * U : 16 * D, my2 = TOUCH ? 8 * U : h - ms - 16 * D;
     ctx.save(); rrect(mx, my2, ms, ms, 14 * D); ctx.clip(); ctx.fillStyle = '#2b2f2a'; ctx.fillRect(mx, my2, ms, ms);
-    const zoom = (Math.abs(G.pspd) > 12 ? 1.5 : 2.1) * D; const rotA = G.camYaw + G.orbit + Math.PI;
+    const zoom = (Math.abs(G.pspd) > 12 ? 1.5 : 2.1) * (TOUCH ? 0.62 * U : D); const rotA = G.camYaw + G.orbit + Math.PI;
     ctx.translate(mx + ms / 2, my2 + ms / 2); ctx.rotate(rotA); ctx.scale(zoom, zoom); ctx.translate(-MX(px), -MZ(pz)); ctx.drawImage(mapCv, 0, 0);
     if (G.route) { ctx.strokeStyle = '#3aa0ff'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); G.route.forEach((p, i) => i ? ctx.lineTo(MX(p[0]), MZ(p[1])) : ctx.moveTo(MX(p[0]), MZ(p[1]))); ctx.stroke(); }
     for (const l of LMS) { ctx.fillStyle = '#e3b341'; ctx.beginPath(); ctx.arc(MX(l.x), MZ(l.z), 3, 0, 7); ctx.fill(); }
