@@ -60,7 +60,7 @@ async function main() {
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000), new THREE.MeshStandardMaterial({ color: 0x1d4a5c, roughness: 0.14, metalness: 0.55, normalMap: waterNormals, normalScale: new THREE.Vector2(0.9, 0.9) }));
   sea.material.userData.envK = 2.2; sea.material.envMapIntensity = 2.2; sea.receiveShadow = true;
   // the sea lies only east of the shoreline, never under the city, so it cannot show through the ground
-  { let xw = 1e9; for (let z = D.bounds.z0 - 400; z <= D.bounds.z1 + 400; z += 20) xw = Math.min(xw, city.coastX(z)); sea.geometry = new THREE.PlaneGeometry(6000, 12000); sea.position.x = xw - 40 + 3000; }
+  { let xw = 1e9; for (let z = D.bounds.z0 - 400; z <= D.bounds.z1 + 400; z += 20) xw = Math.min(xw, city.coastX(z)); sea.geometry = new THREE.PlaneGeometry(80000, 80000); sea.position.x = xw - 40 + 40000; waterNormals.repeat.set(1733, 1733); }
   sea.rotation.x = -Math.PI / 2; sea.position.y = -0.3; scene.add(sea);
   for (const p of city.water.polys) { const g = polyGeom([p], 0.04); const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x35514a, roughness: 0.15, metalness: 0.1 })); m.receiveShadow = true; scene.add(m); }
   // surf line
@@ -274,14 +274,14 @@ async function main() {
   addEventListener('pointerup', ptUp); addEventListener('pointercancel', ptUp);
   // zoom: wheel or pinch. Zooming out past the chase camera lifts into the view from above; zooming in comes back down.
   function zoomBy(f) {
-    if (G.sky) { G.skyH *= f; if (G.skyH < 55) { G.sky = false; G.camDist = 28; } G.skyH = Math.max(55, Math.min(1400, G.skyH)); }
-    else { const d = G.camDist * f; if (d > 34 && G.view === 0) { G.sky = true; G.skyH = 70; G.skyYaw = G.camYaw + G.orbit; } G.camDist = Math.max(3.5, Math.min(30, d)); }
+    if (G.sky) G.skyH = Math.max(3, Math.min(12000, G.skyH * f));
+    else { const d = G.camDist * f; if (d > 34 && G.view === 0) { G.sky = true; G.skyH = 26; G.skyYaw = G.camYaw + G.orbit; } G.camDist = Math.max(2.2, Math.min(30, d)); }
   }
   addEventListener('pointermove', e => {
     if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch > 0 && d > 0) zoomBy(Math.max(0.8, Math.min(1.25, pinch / d))); pinch = d; return; }
     if (drag && drag.id === e.pointerId) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-      if (G.sky) { G.skyYaw += dx * 0.006; G.skyTilt = Math.max(0.35, Math.min(1.45, G.skyTilt + dy * 0.004)); }
+      if (G.sky) { G.skyYaw += dx * 0.006; G.skyTilt = Math.max(0.12, Math.min(1.45, G.skyTilt + dy * 0.004)); }
       else { G.orbit += dx * 0.006; G.camPitch = Math.max(0.03, Math.min(1.2, G.camPitch + dy * 0.004)); G.orbitT = 3; }
       drag.x = e.clientX; drag.y = e.clientY; } });
   canvas.addEventListener('wheel', e => { zoomBy(e.deltaY > 0 ? 1.1 : 0.9); e.preventDefault(); }, { passive: false });
@@ -373,7 +373,7 @@ async function main() {
     hemi.color.set(0xcfe3ff).lerp(new THREE.Color(0x30406a), night);
     const fogDay = new THREE.Color(0xb9c5cf), fogDusk = new THREE.Color(0xd09a78), fogNight = new THREE.Color(0x0b0f18), fogRain = new THREE.Color(0x8d969c);
     scene.fog.color.copy(fogDay).lerp(fogDusk, dusk).lerp(fogNight, night).lerp(fogRain.clone().multiplyScalar(1 - night * 0.85), G.rain);
-    scene.fog.density = ((G.fogBase || 0.00065) + G.rain * 0.0035 + night * 0.0006) * (G.sky ? Math.min(1, 110 / G.skyH) : 1);
+    scene.fog.density = ((G.fogBase || 0.00065) + G.rain * 0.0035 + night * 0.0006) * (G.sky ? Math.min(1, 110 / Math.max(G.skyH, 1)) : 1);
     renderer.toneMappingExposure = lerp(0.72, 1.2, night);
     sea.material.color.set(night > 0.5 ? 0x050c12 : 0x1d4a5c);
     // sky-based environment for reflections, refreshed when the light changes
@@ -402,7 +402,7 @@ async function main() {
     G.rain += (G.rainTarget - G.rain) * Math.min(1, dt * 0.4);
     if (pressed.KeyM) G.bigMap = !G.bigMap;
     if (pressed.KeyV) { G.view = (G.view + 1) % 2; G.sky = false; }
-    if (pressed.KeyZ) { G.sky = !G.sky; if (G.sky) { G.view = 0; G.skyH = Math.max(G.skyH, 200); G.skyYaw = G.camYaw + G.orbit; toast(TOUCH ? 'View from above. Pinch to zoom, drag to turn, SKY to come back.' : 'View from above. Wheel to zoom, drag to turn, Z to come back.', 5); } }
+    if (pressed.KeyZ) { G.sky = !G.sky; if (G.sky) { G.view = 0; G.skyYaw = G.camYaw + G.orbit; toast(TOUCH ? 'View from above. Pinch to zoom, drag to turn, SKY to come back.' : 'View from above. Wheel to zoom, drag to turn, Z to come back.', 5); } }
     if (pressed.KeyP) G.cycleQuality();
     // roadside mechanic: stop the vehicle and press G to have it repaired for a fee
     if (pressed.KeyG) {
@@ -527,7 +527,7 @@ async function main() {
     }
     if (G.sky) {
       const H = G.skyH, back = H / Math.tan(G.skyTilt), fx = Math.sin(G.skyYaw), fz = Math.cos(G.skyYaw);
-      tmpV.set(px - fx * back, H, pz - fz * back); camera.position.lerp(tmpV, Math.min(1, dt * 5)); camera.lookAt(px, 0, pz); camera.fov = 50;
+      tmpV.set(px - fx * back, H, pz - fz * back); camera.position.lerp(tmpV, Math.min(1, dt * 5)); camera.lookAt(px, Math.min(1.3, H * 0.25), pz); camera.fov = 50;
     }
     { const far = G.sky ? Math.max(G.baseFar || 2500, G.skyH * 5 + 800) : (G.baseFar || 2500); if (camera.far !== far) camera.far = far;
       // from high up the ground layers are too close together for the depth buffer unless the near limit moves out with the height
@@ -673,7 +673,7 @@ async function main() {
       if (dmg > 35) { const m = dmg >= 100 ? (TOUCH ? 'Vehicle badly damaged. Stop and tap FIX.' : 'Vehicle badly damaged and crawling. Stop and press G (FIX) to repair it.') : TOUCH ? 'Vehicle damaged. Stop and tap FIX.' : 'Vehicle damaged. Stop and press G (FIX) for a mechanic.'; ctx.font = font(14, 700); ctx.textAlign = 'center'; const tw = Math.min(ctx.measureText(m).width + 28 * D, w - 12 * D), wy = TOUCH ? h * 0.42 : 82 * D; panel(w / 2 - tw / 2, wy, tw, 30 * D); ctx.fillStyle = dmg >= 100 ? '#ff7b72' : '#f2cc60'; ctx.fillText(m, w / 2, wy + 7 * D, tw - 16 * D); ctx.textAlign = 'left'; }
     } else for (const ov of G.owned) { const c = ov.i * CF; if (cars[c + 7] && Math.hypot(cars[c] - px, cars[c + 1] - pz) < cars[c + 14] + 2) { ctx.font = font(15, 700); ctx.textAlign = 'center'; panel(w / 2 - 150 * D, h * 0.64, 300 * D, 34 * D); ctx.fillStyle = '#fff'; ctx.fillText(TOUCH ? `Tap IN/OUT to get in your ${ov.name}` : `Press F to get in your ${ov.name}`, w / 2, h * 0.64 + 9 * D); ctx.textAlign = 'left'; } }
     if (G.help) {
-      const lines = ['W/S or ↑/↓ accelerate and brake/reverse, A/D steer, Space handbrake, H horn', 'F get in or out of your vehicle. Traffic keeps LEFT, as in Chennai', 'On foot: WASD walk, Shift to jog, Q/E turn the camera', 'J job list · X cancel job · M city map · V driver view', 'P graphics: Battery saver, Balanced or High. Lower settings keep a laptop cool', 'G mechanic: stop and press G to repair a damaged vehicle (costs money)', 'T skip one hour (try night) · R monsoon rain · drag to look around, wheel to zoom', 'Z view from above in 3D: wheel or pinch to zoom, drag to turn. Zooming far out also lifts you up', 'Cyan markers are your vehicles: auto, scooter, hatchback and taxi', 'Map data © OpenStreetMap contributors (ODbL)'];
+      const lines = ['W/S or ↑/↓ accelerate and brake/reverse, A/D steer, Space handbrake, H horn', 'F get in or out of your vehicle. Traffic keeps LEFT, as in Chennai', 'On foot: WASD walk, Shift to jog, Q/E turn the camera', 'J job list · X cancel job · M city map · V driver view', 'P graphics: Battery saver, Balanced or High. Lower settings keep a laptop cool', 'G mechanic: stop and press G to repair a damaged vehicle (costs money)', 'T skip one hour (try night) · R monsoon rain · drag to look around, wheel to zoom', 'Z view from above in 3D: wheel or pinch to zoom from street level to 12 km up, drag to turn and tilt', 'Cyan markers are your vehicles: auto, scooter, hatchback and taxi', 'Map data © OpenStreetMap contributors (ODbL)'];
       ctx.font = font(14, 500); const pw = Math.min(720 * D, w - 40 * D), ph = (lines.length * 22 + 50) * D, x0 = (w - pw) / 2, y0 = h * 0.22;
       panel(x0, y0, pw, ph); ctx.fillStyle = '#fff'; ctx.font = font(17, 700); ctx.fillText('Controls', x0 + 18 * D, y0 + 14 * D); ctx.font = font(14, 500); ctx.fillStyle = '#d0d7de'; lines.forEach((l, i) => ctx.fillText(l, x0 + 18 * D, y0 + (44 + i * 22) * D));
     }

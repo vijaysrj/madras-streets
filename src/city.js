@@ -51,6 +51,8 @@ export function buildCity(D, scene, opts = {}) {
     } else poly.push([B.x0 - W, B.z0 - W], [B.x1 + W, B.z0 - W], [B.x1 + W, B.z1 + W], [B.x0 - W, B.z1 + W]);
     group.add(mesh(polyGeom([poly], 0), M.ground, { receive: true }));
   }
+  // open land far beyond the mapped area, so the view from high above has no hard edge
+  { const F = 40000; const far = mesh(polyGeom([[[-F, -F], [F, -F], [F, F], [-F, F]]], -0.6), M.ground, { receive: false }); far.name = 'farland'; group.add(far); }
   // land-use patches
   const byKind = {};
   for (const a of D.areas) if (a.poly && a.poly.length >= 3) (byKind[a.kind] = byKind[a.kind] || []).push(a.poly);
