@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from './merge.js';
 import { addStreetLife } from './street.js';
 import { classifyPlaces, makePlaces } from './places.js';
+import { addBuildingParts } from './buildparts.js';
 import { SegHash, segDist, pointInPoly, minRect, area, centroid, mulberry } from './geom.js';
 import { pbr, photo, facadeTextures, groundFloorTextures, signAtlas, leafTexture, frondTexture, roadMarkTexture } from './textures.js';
 
@@ -105,7 +106,7 @@ export function buildCity(D, scene, opts = {}) {
   const cellMap = () => { const m = new Map(); m.at = c => { const k = Math.floor(c[0] / 250) + ',' + Math.floor(c[1] / 250); let a = m.get(k); if (!a) m.set(k, a = []); return a; }; return m; };
   const facGeo = facades.map(cellMap), shopGeo = shops.map(cellMap), roofGeo = cellMap(), plainGeo = cellMap();
   const signs = [], fronts = [], roofs = [];
-  const tanks = [];
+  const tanks = [], partJobs = [], mumties = [];
   const PAL = [0xf2eee4, 0xf3dfa8, 0xf0cf6a, 0xe9b3a6, 0x9cc6e0, 0xa9dbb4, 0xd98f6a, 0xcfcac0, 0xe7d6b4, 0xc9b3e0, 0xfaf7ef, 0xe6b46e, 0x8fcfc4, 0xf2a7b8, 0xb9e07a, 0x7fb3d9].map(h => new THREE.Color(h));
   const nearMajor = (x, z) => { const nb = hash.nearest(x, z, 40); return nb.s ? nb : null; };
   classifyPlaces(D);
@@ -142,6 +143,7 @@ export function buildCity(D, scene, opts = {}) {
       });
       wallsPlan(poly, plan, b.minH || 0, () => gf, pc => shopGeo[pc.shopStyle].at(c), pc => pc.col, 6, 3.6, 0);
       wallsPlan(poly, plan, gf, () => h, pc => facGeo[pc.style].at(c), pc => pc.col, 6, 3.2, gf);
+      partJobs.push({ poly, plan, gf, h });
       wallsPlan(poly, plan, h, pc => h + pc.par, () => plainGeo.at(c), pc => pl && pl.par ? pl.par : pc.col.clone().multiplyScalar(0.93), 3, 3, 0);
     } else {
       walls(poly, b.minH || 0, h, plainGeo.at(c), col, 3, 3, 0);
@@ -150,6 +152,7 @@ export function buildCity(D, scene, opts = {}) {
     if (!rep) roofGeo.at(c).push(polyGeom([poly], h + 0.02));
     // collision: oriented rectangle around the footprint
     const r = minRect(poly);
+    if (plan && r && h >= 9 && ar > 60 && r.hx > 1.6 && r.hz > 1.6) mumties.push({ r, h, col, poly });
     if (r && b.minH < 2) {
       if (r.hx * r.hz * 4 < ar * 1.6 || poly.length <= 5) addObb(r.cx, r.cz, r.hx, r.hz, r.ux, r.uz);
       else { // irregular: one thin box per wall
@@ -313,8 +316,9 @@ export function buildCity(D, scene, opts = {}) {
   for (const l of waterLines) for (let i = 0; i < l.line.length - 1; i++) rasterSeg(l.line[i][0], l.line[i][1], l.line[i + 1][0], l.line[i + 1][1], l.w / 2, 2);
   for (const r of roads) for (let i = 0; i < r.pts.length - 1; i++) rasterSeg(r.pts[i][0], r.pts[i][1], r.pts[i + 1][0], r.pts[i + 1][1], r.hw + 1, 1);
 
-  D.street = addStreetLife({ D, group, roads, hash, rnd, addObb, inBuilding, fronts, roofs, coastX });
-  console.log('real signs', D.realSigns); console.log('places', JSON.stringify(D.placeStats)); console.log('street', JSON.stringify(D.street));
+  D.parts = addBuildingParts({ group, parts: opts.parts, jobs: partJobs, mumties, inBuilding, facades });
+  D.street = addStreetLife({ D, group, roads, hash, rnd, addObb, inBuilding, fronts, roofs, coastX, parts: opts.parts });
+  console.log('real signs', D.realSigns); console.log('places', JSON.stringify(D.placeStats)); console.log('street', JSON.stringify(D.street)); console.log('parts', JSON.stringify(D.parts));
   // City-wide instanced meshes (trees, palms, lamps, roof tanks) are split into 250 m cells so the renderer can skip
   // the ones outside the view, and every detail mesh records its centre so far-away detail can be hidden.
   for (const im of group.children.slice()) {
@@ -329,7 +333,7 @@ export function buildCity(D, scene, opts = {}) {
     group.remove(im); im.dispose();
   }
   const lod = [];
-  for (const o of group.children) { if (!/^(tree|palm|lamp|tank|prop|wire|place)$/.test(o.name)) continue; let bs = o.boundingSphere; if (!bs) { if (o.isInstancedMesh) { o.computeBoundingSphere(); bs = o.boundingSphere; } else { if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); bs = o.geometry.boundingSphere; } } lod.push({ o, x: bs.center.x, z: bs.center.z, r: bs.radius, kind: o.name }); }
+  for (const o of group.children) { if (!/^(tree|palm|lamp|tank|prop|wire|place|bpart|bsmall|roofpart|bike)$/.test(o.name)) continue; let bs = o.boundingSphere; if (!bs) { if (o.isInstancedMesh) { o.computeBoundingSphere(); bs = o.boundingSphere; } else { if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); bs = o.geometry.boundingSphere; } } lod.push({ o, x: bs.center.x, z: bs.center.z, r: bs.radius, kind: o.name }); }
   return { lod, group, roads, hash, boxes, grid, gw, gh, GC, gx0, gz0, lamps, coastX, water, byKind };
 }
 

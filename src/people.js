@@ -183,7 +183,7 @@ function describe(i, female) {
   if (female) {
     if (r(10) < 7) { S.outfit = 'saree'; S.cell = r(8); S.c2 = [0x7a1538, 0x1f5f3a, 0xc08a10, 0x2a2a6a, 0x9a2050, 0x204a70, 0x7a1f1f, 0x3a2a5a][S.cell]; }
     else { S.outfit = 'kameez'; S.cell = r(2) ? 11 : 8; S.c1 = KAMEEZ[r(KAMEEZ.length)]; S.c2 = [0xf2efe6, 0x2a2a30, 0xf0c040, 0x1f6f6a, 0xd0356a][r(5)]; }
-    S.jasmine = r(3) > 0;
+    S.jasmine = r(3) > 0; S.bindi = r(10) < 7;
   } else {
     S.outfit = 'shirt'; S.c1 = SHIRT[r(SHIRT.length)]; S.cell = [8, 8, 9, 10][r(4)];
     const k = r(10); S.lower = k < 4 ? 'trousers' : k < 7 ? 'veshti' : 'lungi';
@@ -202,7 +202,9 @@ function dress(obj, S) {
     const n = o.name; o.frustumCulled = false; o.castShadow = true;
     if (/Headwear|Outfit_Top|Teeth/.test(n)) { o.visible = false; return; }
     o.material = o.material.clone();
-    if (n === 'Wolf3D_Head') { head = o; o.material.color.copy(tint); o.material.roughness = 0.75; }
+    // women: the "female" shape made in Blender (softer jaw and chin, smaller nose and brow) and a face texture with thin brows and kajal
+    if (o.morphTargetDictionary && 'female' in o.morphTargetDictionary) o.morphTargetInfluences[o.morphTargetDictionary.female] = S.female ? 1 : 0;
+    if (n === 'Wolf3D_Head') { head = o; o.material.color.copy(tint); o.material.roughness = 0.75; if (S.female && FACE[S.bindi ? 1 : 0]) o.material.map = FACE[S.bindi ? 1 : 0]; }
     else if (n === 'Wolf3D_Body') o.material.color.copy(tint);
     else if (n === 'Wolf3D_Beard') { o.visible = !S.female && !!S.moustache; o.material.map = null; o.material.color.set(S.grey ? 0x8a8a88 : 0x120e0b); }
     else if (n === 'Wolf3D_Outfit_Bottom') { o.visible = S.outfit === 'shirt' && S.lower === 'trousers'; o.material.map = null; o.material.color.set(S.trouser || 0x2b3445); o.material.roughness = 0.9; o.material.metalness = 0; }
@@ -216,8 +218,10 @@ function dress(obj, S) {
   return obj;
 }
 
+const FACE = [];
 export async function loadPeople() {
   const loader = new GLTFLoader();
+  { const tl = new THREE.TextureLoader(); for (const k of ['skinF', 'skinFB']) { const t = tl.load(ASSETS[k]); t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; FACE.push(t); } }
   const load = url => new Promise((res, rej) => loader.load(url, res, undefined, rej));
   const [anims, man] = await Promise.all([load(ASSETS.anims), load(ASSETS.man)]);
   // Retarget by world-space rotation deltas: both rigs rest in a T/A-pose, but their bones use different local axes,

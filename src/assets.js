@@ -1,7 +1,7 @@
 // Asset locations. In development these are files next to index.html; in the single-file build
 // the bundle defines window.__PACK = { name: [mime, gzip?, base64] } and we turn them into blob URLs.
 const TEX = ['Asphalt026A', 'Ground037', 'Ground054', 'PavingStones092', 'Plaster001', 'Grass004', 'Concrete034', 'Bricks076C'];
-export const ASSETS = { anims: 'assets/anims.glb', man: 'assets/readyplayer.me.glb', sim: 'assets/sim.wasm', waternormals: 'assets/waternormals.jpg' };
+export const ASSETS = { anims: 'assets/anims.glb', man: 'assets/person.glb', sim: 'assets/sim.wasm', waternormals: 'assets/waternormals.jpg', skinF: 'assets/skin_f.jpg', skinFB: 'assets/skin_f_bindi.jpg', parts: 'assets/buildparts.glb', street: 'assets/street.glb' };
 for (const t of TEX) for (const m of ['Color', 'NormalGL', 'Roughness']) ASSETS[`${t}_${m}`] = `assets/${t}_${m}.jpg`;
 
 const b64bytes = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };

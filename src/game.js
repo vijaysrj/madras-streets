@@ -5,6 +5,7 @@ import { parseOSM } from './osm.js';
 import { buildCity, polyGeom } from './city.js';
 import { Fleet } from './vehicles.js';
 import { loadPeople, Crowd } from './people.js';
+import { loadParts } from './buildparts.js';
 import { ASSETS, loadOSM } from './assets.js';
 import { mulberry } from './geom.js';
 
@@ -52,7 +53,8 @@ async function main() {
   const envScene = new THREE.Scene(); const envSky = new Sky(); envSky.scale.setScalar(1000); envScene.add(envSky);
 
   setLoad('Building 9,000 real buildings and the street network…'); await tick();
-  const city = buildCity(D, scene);
+  const parts = await loadParts();
+  const city = buildCity(D, scene, { parts });
   // sea and other water
   const waterNormals = new THREE.TextureLoader().load(ASSETS.waternormals, t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; });
   // The sea reflects the sky environment instead of re-rendering the whole city in a mirror pass (a third of the frame cost).
@@ -177,7 +179,7 @@ async function main() {
   const rig = await loadPeople();
   const crowd = new Crowd(scene, rig, 40);
   const me = crowd.makePlayer(scene);
-  const fleet = new Fleet(scene);
+  const fleet = new Fleet(scene); fleet.useModels(parts);
 
   // ---------------- game state ----------------
   const store = (() => { try { return JSON.parse(localStorage.getItem('madras-streets-2') || '{}'); } catch (e) { return {}; } })();
@@ -517,7 +519,7 @@ async function main() {
   }
 
   const tmpV = new THREE.Vector3();
-  const camFwd = new THREE.Vector3(), LODR = { tree: 650, palm: 800, lamp: 420, tank: 450, prop: 330, wire: 200, place: 900 };
+  const camFwd = new THREE.Vector3(), LODR = { tree: 650, palm: 800, lamp: 420, tank: 450, prop: 330, wire: 200, place: 900, bpart: 170, bsmall: 95, roofpart: 420, bike: 120 };
   const P = G.prof = { upd: 0, pre: 0, gl: 0, hud: 0, n: 0, t0: 0 };
   function render(dt) {
     P.t0 = performance.now();

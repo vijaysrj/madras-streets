@@ -74,18 +74,19 @@ function kioskTexture() {
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
-export function addStreetLife({ D, group, roads, hash, rnd, addObb, inBuilding, fronts, roofs, coastX }) {
+export function addStreetLife({ D, group, roads, hash, rnd, addObb, inBuilding, fronts, roofs, coastX, parts }) {
+  const P = parts || {}, vcMat = o => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, ...o });
   const C = h => new THREE.Color(h);
   const std = (o) => new THREE.MeshStandardMaterial({ roughness: 0.85, ...o });
   const inst = (geo, mat, list, colours, opts = {}) => {
     if (!list.length) return [];
     // one InstancedMesh per 250 m cell, so whole neighbourhoods outside the view are culled
-    const cells = new Map(); list.forEach((l, i) => { const k = Math.floor(l.x / 250) + ',' + Math.floor(l.z / 250); let a = cells.get(k); if (!a) cells.set(k, a = []); a.push([l, i]); });
+    const CS = opts.cell || 250, cells = new Map(); list.forEach((l, i) => { const k = Math.floor(l.x / CS) + ',' + Math.floor(l.z / CS); let a = cells.get(k); if (!a) cells.set(k, a = []); a.push([l, i]); });
     const out = [], m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), sc = new THREE.Vector3(1, 1, 1);
     for (const a of cells.values()) {
       const im = new THREE.InstancedMesh(geo, mat, a.length);
       a.forEach(([l, gi], i) => { q.setFromAxisAngle(up, l.yaw || 0); sc.setScalar(l.s || 1); m4.compose(new THREE.Vector3(l.x, l.y || 0, l.z), q, sc); im.setMatrixAt(i, m4); if (colours) im.setColorAt(i, colours(l, gi)); });
-      im.computeBoundingSphere(); im.castShadow = opts.cast !== false; im.receiveShadow = true; im.matrixAutoUpdate = false; im.name = 'prop'; group.add(im); out.push(im);
+      im.computeBoundingSphere(); im.castShadow = opts.cast !== false; im.receiveShadow = true; im.matrixAutoUpdate = false; im.name = opts.name || 'prop'; group.add(im); out.push(im);
     }
     return out;
   };
@@ -156,12 +157,14 @@ export function addStreetLife({ D, group, roads, hash, rnd, addObb, inBuilding, 
     const tank = new THREE.BoxGeometry(0.3, 0.3, 0.75); tank.translate(0, 0.6, 0.05);
     const shield = new THREE.BoxGeometry(0.36, 0.5, 0.08); shield.rotateX(-0.3); shield.translate(0, 0.72, 0.42);
     const tail = new THREE.BoxGeometry(0.28, 0.22, 0.45); tail.translate(0, 0.62, -0.42);
-    const body = mergeGeometries([tank, shield, tail]);
+    let body = mergeGeometries([tank, shield, tail]), dark2 = dark;
+    // the Blender motorcycle (blender/street_objects.py) when it loaded
+    if (P.bike_body && P.bike_dark) { body = P.bike_body.clone(); dark2 = P.bike_dark.clone(); }
     // tilt on the side stand
-    for (const g of [dark, body]) g.rotateZ(0.12);
+    for (const g of [dark2, body]) g.rotateZ(0.12);
     const cols = [0x1a1a1c, 0xb3202a, 0x1f4f9a, 0xd9d9d6, 0x2a2a2e, 0x8a8f96, 0x0f5a4a, 0xe0a020].map(C);
-    inst(dark, std({ color: 0x141414, roughness: 0.7 }), bikes, null, { cast: false });
-    inst(body, new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.3 }), bikes, (l, i) => cols[i * 7 % cols.length]);
+    inst(dark2, dark2 === dark ? std({ color: 0x141414, roughness: 0.7 }) : vcMat({ roughness: 0.5, metalness: 0.4 }), bikes, null, { cast: false, cell: 80, name: 'bike' });
+    inst(body, new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.3 }), bikes, (l, i) => cols[i * 7 % cols.length], { cell: 80, name: 'bike' });
   }
 
   // ---- petti kadai (tea and snack kiosks) and pushcarts on the busier roads
@@ -183,13 +186,14 @@ export function addStreetLife({ D, group, roads, hash, rnd, addObb, inBuilding, 
     inst(g, [side, side, std({ color: 0x8a8d90, metalness: 0.4, roughness: 0.5 }), side, front, side], kiosks);
     const aw = new THREE.BoxGeometry(2.5, 0.05, 1.1); aw.rotateX(0.25); aw.translate(0, 2.25, 1.15);
     const bench = new THREE.BoxGeometry(1.4, 0.06, 0.3); bench.translate(1.9, 0.45, 0.6); const leg1 = new THREE.BoxGeometry(0.06, 0.45, 0.28); leg1.translate(1.3, 0.22, 0.6); const leg2 = leg1.clone(); leg2.translate(1.2, 0, 0);
-    inst(mergeGeometries([aw, bench, leg1, leg2]), std({ color: 0x7a5a3a }), kiosks);
+    if (P.kiosk_extra) inst(P.kiosk_extra, vcMat({ side: THREE.DoubleSide }), kiosks); else inst(mergeGeometries([aw, bench, leg1, leg2]), std({ color: 0x7a5a3a }), kiosks);
   }
   if (carts.length) {
     const top = new THREE.BoxGeometry(1.7, 0.08, 0.95); top.translate(0, 0.85, 0);
     const parts = [top]; for (const [x, z] of [[0.6, 0.5], [-0.6, 0.5], [0.6, -0.5], [-0.6, -0.5]]) { const w = new THREE.CylinderGeometry(0.34, 0.34, 0.04, 14); w.rotateX(Math.PI / 2); w.translate(x, 0.34, z); parts.push(w); const l = new THREE.BoxGeometry(0.05, 0.5, 0.05); l.translate(x, 0.6, z * 0.85); parts.push(l); }
     const handle = new THREE.BoxGeometry(0.05, 0.05, 1.0); handle.translate(-0.95, 0.95, 0); parts.push(handle);
-    inst(mergeGeometries(parts.map(p => p.index ? p.toNonIndexed() : p)), std({ color: 0x6a5238 }), carts);
+    if (P.cart) { const g = P.cart.clone(); g.rotateY(Math.PI / 2); inst(g, vcMat({ side: THREE.DoubleSide }), carts); }
+    else inst(mergeGeometries(parts.map(p => p.index ? p.toNonIndexed() : p)), std({ color: 0x6a5238 }), carts);
     // heaps of produce: oranges, bananas, guavas, tomatoes
     const heap = []; let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
     for (let k = 0; k < 46; k++) { const sp = new THREE.IcosahedronGeometry(0.075, 0); const a = r() * 6.28, d = Math.sqrt(r()); sp.translate(Math.cos(a) * d * 0.7, 0.95 + (1 - d) * 0.22 + r() * 0.03, Math.sin(a) * d * 0.38); heap.push(sp); }

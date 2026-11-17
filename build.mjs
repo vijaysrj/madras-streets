@@ -33,7 +33,7 @@ await esbuild.build({ entryPoints: ['src/game.js'], bundle: true, format: 'esm',
 if (process.argv.includes('--dev')) process.exit(0);
 
 // --- pack assets
-const list = { anims: 'assets/anims.glb', man: 'assets/readyplayer.me.glb', sim: 'assets/sim.wasm', waternormals: 'assets/waternormals.jpg' };
+const list = { anims: 'assets/anims.glb', man: 'assets/person.glb', sim: 'assets/sim.wasm', waternormals: 'assets/waternormals.jpg', skinF: 'assets/skin_f.jpg', skinFB: 'assets/skin_f_bindi.jpg', parts: 'assets/buildparts.glb', street: 'assets/street.glb' };
 for (const t of ['Asphalt026A', 'Ground037', 'Ground054', 'PavingStones092', 'Plaster001', 'Grass004', 'Concrete034', 'Bricks076C']) for (const m of ['Color', 'NormalGL', 'Roughness']) list[`${t}_${m}`] = `assets/${t}_${m}.jpg`;
 const mime = f => f.endsWith('.glb') ? 'model/gltf-binary' : f.endsWith('.wasm') ? 'application/wasm' : 'image/jpeg';
 const pack = {};

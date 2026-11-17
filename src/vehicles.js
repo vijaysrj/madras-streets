@@ -87,6 +87,15 @@ export class Fleet {
     this.helmetMats = [0x111111, 0xeeeeee, 0x1f4fa0, 0xb01010].map(c => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.2, clearcoat: 1 }));
     this.cars = new Map();
   }
+  // swap the procedural auto-rickshaw for the Blender model (blender/street_objects.py)
+  useModels(P) {
+    if (!P || !P.auto_body) return;
+    const T = this.T[1];
+    for (const k of ['body', 'canvas', 'dark', 'seat', 'glass', 'head', 'tail', 'plate']) if (P['auto_' + k]) T[k] = P['auto_' + k];
+    T.darkVC = true;
+    this.M.darkVC = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.35 });
+    this.M.glass2 = this.M.glass.clone(); this.M.glass2.side = THREE.DoubleSide;
+  }
   make(type, col, isPlayer) {
     const T = this.T[type], g = new THREE.Group(), M = this.M;
     const add = (geo, mat) => { if (!geo) return null; const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
@@ -98,7 +107,7 @@ export class Fleet {
     if (type === 5) bodyMat = this.paints[(col * 3) % this.paints.length];
     const parts = {};
     parts.body = add(T.body, bodyMat);
-    add(T.glass, M.glass); add(T.dark, M.dark); add(T.canvas, M.canvas); add(T.seat, M.seat); add(T.cream, M.cream); add(T.plate, M.plate);
+    add(T.glass, T.darkVC ? M.glass2 : M.glass); add(T.dark, T.darkVC ? M.darkVC : M.dark); add(T.canvas, M.canvas); add(T.seat, M.seat); add(T.cream, M.cream); add(T.plate, M.plate);
     if (T.rider) { add(T.rider, isPlayer ? new THREE.MeshStandardMaterial({ color: 0xe8742a }) : this.riderMats[col % 5]); add(T.helmet, isPlayer ? this.helmetMats[3] : this.helmetMats[col % 4]); }
     parts.head = add(T.head, M.head); parts.tail = add(T.tail, M.tail);
     if (type === 4) add(rb(0.6, 0.18, 0.28, 0.05, 0, 1.55, -0.2), M.taxiSign);
@@ -134,7 +143,7 @@ export class Fleet {
       for (const w of rec.g.userData.parts.wheels) { w.rotation.x = rec.spin; w.rotation.y = w.userData.front ? -steer * 0.8 : 0; w.rotation.order = 'YXZ'; }
       const p = rec.g.userData.parts;
       if (p.tail) p.tail.material = brake ? this.M.tailOn : this.M.tail;
-      rec.g.traverse(m => { if (m.isMesh && (m.material === this.M.glass || m.material === this.M.canvas)) m.visible = !(i === pcar && hideCabin); });
+      rec.g.traverse(m => { if (m.isMesh && (m.material === this.M.glass || m.material === this.M.glass2 || m.material === this.M.canvas)) m.visible = !(i === pcar && hideCabin); });
     }
     this.M.head.emissiveIntensity = 0.2 + night * 3;
     this.M.tail.emissiveIntensity = 0.15 + night * 0.8;

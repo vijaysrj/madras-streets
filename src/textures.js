@@ -72,7 +72,7 @@ export function facadeTextures() {
     for (let k = 0; k < 7; k++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '255,255,255' : '90,80,70'},${0.05 + rnd() * 0.08})`; g.beginPath(); g.ellipse(rnd() * 512, rnd() * 272, 20 + rnd() * 60, 10 + rnd() * 40, rnd() * 3, 0, 7); g.fill(); }
     const mould = g.createLinearGradient(0, 0, 0, 40); mould.addColorStop(0, 'rgba(35,35,30,0.35)'); mould.addColorStop(1, 'rgba(35,35,30,0)'); g.fillStyle = mould; g.fillRect(0, 0, 512, 40);
     grime(g, 512, 272, rnd, 1.5);
-    const t = tex(c); t.userData.lit = tex(mc); styles.push(t);
+    const t = tex(c); t.userData.lit = tex(mc); t.userData.win = { w: winW / 85.33, h: winH / 85 }; styles.push(t);
   }
   return styles;
 }
