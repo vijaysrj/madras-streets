@@ -161,7 +161,7 @@ async function main() {
   console.log('landmarks', LMS.map(l => l.name).join(', '));
 
   function dijkstra(src, adj = adjDir) {
-    const dist = new Float32Array(NV).fill(Infinity), prev = new Int32Array(NV).fill(-1), heap = [];
+    const dist = new Float64Array(NV).fill(Infinity) /* 64-bit: with 32-bit storage the "stale entry" check below wrongly drops most of the search */, prev = new Int32Array(NV).fill(-1), heap = [];
     const push = (d, v) => { heap.push([d, v]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
     const pop = () => { const t = heap[0], l = heap.pop(); if (heap.length) { heap[0] = l; let i = 0; for (;;) { const a = 2 * i + 1, b = a + 1; let m = i; if (a < heap.length && heap[a][0] < heap[m][0]) m = a; if (b < heap.length && heap[b][0] < heap[m][0]) m = b; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return t; };
     dist[src] = 0; push(0, src);
@@ -259,6 +259,7 @@ async function main() {
     return out;
   }
 
+  G.dbg = { setRoute, tracePath, nearestVertex, dijkstra, onMain, roads, adjU, adjDir, vx, vz };
   // ---------------- input ----------------
   const keys = {}, pressed = {};
   addEventListener('keydown', e => { if (!e.repeat) pressed[e.code] = true; keys[e.code] = true; // not gated on the held state: a missed key-up (common with Shift or Cmd on a Mac) must not block the next press
@@ -336,7 +337,7 @@ async function main() {
   const chevGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-0.7, 0, -0.4), new THREE.Vector3(0, 0, 0.6), new THREE.Vector3(0.7, 0, -0.4), new THREE.Vector3(0, 0, 0)]); chevGeo.setIndex([0, 1, 3, 3, 1, 2]);
   const GPSN = 600, gpsGeo = new THREE.BufferGeometry(); gpsGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(GPSN * 6), 3));
   { const ix = []; for (let i = 0; i < GPSN - 1; i++) { const a = i * 2; ix.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } gpsGeo.setIndex(ix); gpsGeo.setDrawRange(0, 0); }
-  const gpsLine = new THREE.Mesh(gpsGeo, new THREE.MeshBasicMaterial({ color: 0x2f8fff, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, fog: false }));
+  const gpsLine = new THREE.Mesh(gpsGeo, new THREE.MeshBasicMaterial({ color: 0x2f8fff, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -8, fog: false }));
   gpsLine.frustumCulled = false; gpsLine.renderOrder = 2; gpsLine.visible = false; scene.add(gpsLine); let gpsDrawn = null;
   const chevs = new THREE.InstancedMesh(chevGeo, chevMat, 40); chevs.frustumCulled = false; scene.add(chevs);
   const ownedMarks = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.35), new THREE.MeshBasicMaterial({ color: 0x39d0ff }), 12); ownedMarks.frustumCulled = false; scene.add(ownedMarks);
@@ -586,13 +587,13 @@ async function main() {
       gpsDrawn = G.route; const pa = gpsGeo.attributes.position.array; let n = 0, acc = 0, rem = 0;
       for (let i = 1; i < G.route.length; i++) rem += Math.hypot(G.route[i][0] - G.route[i - 1][0], G.route[i][1] - G.route[i - 1][1]);
       G.routeLeft = rem;
-      const R = G.route, HW = 0.9;
+      const R = G.route, HW = G.sky ? Math.max(0.9, G.skyH * 0.012) : 0.9, RY = G.sky ? Math.min(3, 0.14 + G.skyH * 0.002) : 0.14; // wider from above so it stays visible
       const i0 = 0;
-      for (let i = i0; i < R.length && n < GPSN && acc < 900; i++) {
+      for (let i = i0; i < R.length && n < GPSN && acc < 9000; i++) {
         const a = R[Math.max(i0, i - 1)], b = R[Math.min(R.length - 1, i + 1)]; let dx = b[0] - a[0], dz = b[1] - a[1]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
         if (i > i0 && i < R.length - 1 && Math.hypot(R[i][0] - R[i - 1][0], R[i][1] - R[i - 1][1]) < 0.3) continue;
         if (i > i0) acc += Math.hypot(R[i][0] - R[i - 1][0], R[i][1] - R[i - 1][1]);
-        pa[n * 6] = R[i][0] + dz * HW; pa[n * 6 + 1] = 0.14; pa[n * 6 + 2] = R[i][1] - dx * HW; pa[n * 6 + 3] = R[i][0] - dz * HW; pa[n * 6 + 4] = 0.14; pa[n * 6 + 5] = R[i][1] + dx * HW; n++;
+        pa[n * 6] = R[i][0] + dz * HW; pa[n * 6 + 1] = RY; pa[n * 6 + 2] = R[i][1] - dx * HW; pa[n * 6 + 3] = R[i][0] - dz * HW; pa[n * 6 + 4] = RY; pa[n * 6 + 5] = R[i][1] + dx * HW; n++;
       }
       gpsGeo.setDrawRange(0, Math.max(0, n - 1) * 6); gpsGeo.attributes.position.needsUpdate = true;
     }
