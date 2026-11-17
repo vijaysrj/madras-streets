@@ -33,10 +33,11 @@
   #touch .b { touch-action: none; -webkit-user-select: none; position: fixed; z-index: 10; width: 74px; height: 74px; border-radius: 50%; background: rgba(20,24,30,0.5); border: 2px solid rgba(255,255,255,0.35); color: #fff; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; touch-action: none; }
   #touch .b.on { background: rgba(242,179,33,0.65); }
   #touch .s { width: 56px; height: 56px; font-size: 12px; }
-  #menuB { right: calc(8px + env(safe-area-inset-right)); top: calc(8px + env(safe-area-inset-top)); width: 44px !important; height: 34px !important; border-radius: 10px !important; font-size: 18px !important; background: rgba(20,24,30,0.4) !important; border-width: 1px !important; }
-  #tbar { position: fixed; z-index: 11; top: calc(48px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); display: none; grid-template-columns: repeat(4, 54px); gap: 6px; padding: 8px; border-radius: 14px; background: rgba(12,14,18,0.78); }
+  #menuB { right: calc(8px + env(safe-area-inset-right)); top: calc(8px + env(safe-area-inset-top)); width: 82px !important; height: 34px !important; border-radius: 10px !important; font-size: 13px !important; letter-spacing: 0.5px; background: rgba(12,14,18,0.82) !important; border: 2px solid rgba(255,255,255,0.75) !important; }
+  body.menu #menuB { background: rgba(242,179,33,0.9) !important; color: #1b1300 !important; }
+  #tbar { position: fixed; z-index: 11; top: calc(48px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); display: none; grid-template-columns: repeat(4, 54px); gap: 6px; padding: 8px; border-radius: 14px; background: rgba(12,14,18,0.88); border: 1px solid rgba(255,255,255,0.3); }
   body.menu #tbar { display: grid; }
-  #tbar .b { position: static; box-sizing: border-box; width: 54px; height: 50px; border-radius: 12px; font-size: 11px; letter-spacing: 0.3px; }
+  #tbar .b { position: static; box-sizing: border-box; width: 54px; height: 50px; border-radius: 12px; font-size: 11px; letter-spacing: 0.3px; background: rgba(60,68,80,0.95); border-color: rgba(255,255,255,0.6); }
   body:not(.job) #tbar .jobonly { display: none; }
   @media (orientation: landscape) and (max-height: 520px) { #hornB { left: calc(188px + env(safe-area-inset-left)) !important; bottom: 48px !important; } }
   #title .sub { font-size: 13px; color: #8f9aa6; margin-top: 14px; }
@@ -64,7 +65,7 @@
   <div class="b" data-key="KeyW" style="right:calc(14px + env(safe-area-inset-right));bottom:124px">GO</div>
   <div class="b" data-key="KeyS" style="right:calc(134px + env(safe-area-inset-right));bottom:30px;font-size:13px">BRAKE</div>
   <div class="b s" data-key="KeyF" style="right:calc(22px + env(safe-area-inset-right));bottom:210px;font-size:11px">IN/OUT</div>
-  <div class="b" id="menuB">☰</div>
+  <div class="b" id="menuB">☰ MENU</div>
   <div id="tbar">
     <div class="b" data-key="KeyJ">JOBS</div>
     <div class="b" data-key="KeyM">MAP</div>

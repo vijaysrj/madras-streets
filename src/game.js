@@ -261,14 +261,16 @@ async function main() {
 
   // ---------------- input ----------------
   const keys = {}, pressed = {};
-  addEventListener('keydown', e => { if (!keys[e.code]) pressed[e.code] = true; keys[e.code] = true; if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); });
+  addEventListener('keydown', e => { if (!e.repeat) pressed[e.code] = true; keys[e.code] = true; // not gated on the held state: a missed key-up (common with Shift or Cmd on a Mac) must not block the next press
+    if (e.code === 'F1' || e.code === 'Slash') e.preventDefault(); if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); });
   addEventListener('keyup', e => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
   let drag = null;
   canvas.addEventListener('pointerdown', e => {
     // tap or click a job in the list to accept it
     if (G.offers && G.offerRects) { const hx = e.clientX * hud.width / innerWidth, hy = e.clientY * hud.height / innerHeight; const k = G.offerRects.findIndex(r => hx >= r[0] && hx <= r[2] && hy >= r[1] && hy <= r[3]); if (k >= 0) { acceptOffer(k); return; } }
-    if (e.pointerType !== 'mouse' && (G.offers || G.bigMap || G.help)) { G.offers = null; G.bigMap = false; G.help = false; return; }
+    if (G.help) { G.help = false; return; } // any click or tap closes the controls panel
+    if (e.pointerType !== 'mouse' && (G.offers || G.bigMap)) { G.offers = null; G.bigMap = false; return; }
     if (e.isPrimary) pts.clear(); // drop any finger whose lift was missed
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinch = 0; pinch0 = 0;
     drag = pts.size === 1 ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
@@ -425,6 +427,7 @@ async function main() {
         else if (Math.abs(cars[o + 12]) > 1.5) toast('Stop the vehicle first, then press G for the mechanic.', 3);
         else { const cost = Math.min(G.money, Math.round(dmg * 3)); G.money -= cost; S.repair(pcarIdx); sfx('ding'); toast(`Mechanic repaired your vehicle for ₹${cost}.`, 4); } } }
     if (pressed.F1 || pressed.Slash) G.help = !G.help;
+    if (pressed.Escape) { G.help = false; G.bigMap = false; G.offers = null; }
     if (pressed.KeyJ) { if (G.job) toast('Finish or cancel (X) your current job first.', 3); else if (G.offers) G.offers = null; else makeOffers(); }
     if (G.offers) for (let k = 0; k < G.offers.length; k++) if (pressed['Digit' + (k + 1)]) { acceptOffer(k); break; }
     if (pressed.KeyX && G.job) { toast('Job cancelled.', 3); G.job = null; G.routeTree = null; }
@@ -625,7 +628,7 @@ async function main() {
     const px = G.px, pz = G.pz;
     ctx.textBaseline = 'top';
     if (TOUCH) {
-      const sx = 102 * U, sw = w - sx - 60 * U; ctx.globalAlpha = 0.85; panel(sx, 8 * U, sw, 30 * U); ctx.globalAlpha = 1;
+      const sx = 102 * U, sw = w - sx - 96 * U; ctx.globalAlpha = 0.85; panel(sx, 8 * U, sw, 30 * U); ctx.globalAlpha = 1;
       ctx.font = font(15, 700); ctx.fillStyle = '#7ee787'; const mt = '₹ ' + G.money.toLocaleString('en-IN'); ctx.fillText(mt, sx + 10 * U, 15 * U); const mw = ctx.measureText(mt).width;
       ctx.font = font(12, 600); ctx.fillStyle = '#e6edf3'; ctx.fillText(clockStr() + (G.trips ? ` · ${(G.ratingSum / G.trips).toFixed(1)}★ · ${G.trips} trips` : ''), sx + 20 * U + mw, 17 * U, sw - mw - 30 * U);
     } else {
@@ -655,7 +658,10 @@ async function main() {
       { const lastS = J.si === J.stops.length - 1, k = J.kind, verb = J.stage === 'pickup' ? (J.challenge ? 'Start at' : 'Pick up at') : J.challenge ? (lastS ? 'Finish at' : 'Checkpoint:') : k === 'share' ? (lastS ? 'Drop everyone at' : 'Next pickup:') : k === 'tour' ? 'Tour stop:' : /^(ride|school|hospital)$/.test(k) ? 'Drop passenger at' : 'Deliver to'; ctx.fillStyle = J.col; ctx.fillText(`${J.label.replace('Challenge: ', '')} · ${verb} ${tgt.name}`, x0 + 16 * D, 24 * D, pw - 32 * D); }
       ctx.font = font(13, 500); ctx.fillStyle = '#c9d1d9'; const d = (G.routeLeft > 0 ? G.routeLeft : Math.hypot(tgt.stop.x - px, tgt.stop.z - pz)) / 1000, left = J.limit - J.t;
       ctx.fillText(`${d < 1 ? Math.round(d * 100) * 10 + ' m' : d.toFixed(1) + ' km'} by road${J.stage === 'carry' ? ` · ${left > 0 ? Math.ceil(left) + 's left' : 'running late'} · ${J.kind === 'test' ? 'faults ' + J.faults + '/2' : J.kind === 'fragile' ? 'cargo ' + Math.round(J.cargo) + '%' : J.kind === 'clean' ? 'no scratches so far' : J.rating.toFixed(1) + '★'}${J.stops.length > 2 ? ' · stop ' + J.si + ' of ' + (J.stops.length - 1) : ''}` : ''} ${TOUCH ? '' : ' · X to cancel'}`, x0 + 16 * D, 48 * D, pw - 32 * D); ctx.restore(); ctx.globalAlpha = 1;
-    } else if (!TOUCH) { ctx.font = font(13, 500); ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.textAlign = 'center'; ctx.fillText('J jobs · M map · V driver view · Z from above · P graphics · T skip hour · R rain · ? help', w / 2, 20 * D); ctx.textAlign = 'left'; }
+    } else if (!TOUCH) { // shortcut row on a dark strip so it stays readable against a bright sky
+      const t = 'J jobs · M map · V driver view · Z from above · P graphics · G repair · T skip hour · R rain · ? help'; ctx.font = font(14, 600);
+      const x0 = 236 * D, room = w - x0 - 14 * D, tw = Math.min(ctx.measureText(t).width, room - 28 * D), pw = tw + 28 * D, px0 = Math.max(x0, Math.min(w / 2 - pw / 2, w - 14 * D - pw));
+      panel(px0, 14 * D, pw, 32 * D); ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText(t, px0 + pw / 2, 22 * D, tw); ctx.textAlign = 'left'; }
     G.msg = G.msg.filter(m => m.until > G.time);
     let my = TOUCH && !narrow ? 104 * U : (TOUCH ? h - 236 * U : h - (pcarIdx >= 0 ? 200 : 110) * D) - G.msg.length * 36 * D; ctx.textAlign = 'center';
     for (const m of G.msg) { ctx.font = font(15, 600); const tw = Math.min(ctx.measureText(m.t).width + 28 * D, w - 12 * D); panel(w / 2 - tw / 2, my, tw, 30 * D); ctx.fillStyle = '#fff'; ctx.fillText(m.t, w / 2, my + 7 * D, tw - 16 * D); my += 36 * D; }
@@ -695,7 +701,7 @@ async function main() {
     if (G.help) {
       const lines = ['W/S or ↑/↓ accelerate and brake/reverse, A/D steer, Space handbrake, H horn', 'F get in or out of your vehicle. Traffic keeps LEFT, as in Chennai', 'On foot: WASD walk, Shift to jog, Q/E turn the camera', 'J job list · X cancel job · M city map · V driver view', 'P graphics: Battery saver, Balanced or High. Lower settings keep a laptop cool', 'G mechanic: stop and press G to repair a damaged vehicle (costs money)', 'T skip one hour (try night) · R monsoon rain · drag to look around, wheel to zoom', 'Z view from above in 3D: wheel or pinch to zoom from street level to 12 km up, drag to turn and tilt', 'Cyan markers are your vehicles: auto, scooter, hatchback and taxi', 'Map data © OpenStreetMap contributors (ODbL)'];
       ctx.font = font(14, 500); const pw = Math.min(720 * D, w - 40 * D), ph = (lines.length * 22 + 50) * D, x0 = (w - pw) / 2, y0 = h * 0.22;
-      panel(x0, y0, pw, ph); ctx.fillStyle = '#fff'; ctx.font = font(17, 700); ctx.fillText('Controls', x0 + 18 * D, y0 + 14 * D); ctx.font = font(14, 500); ctx.fillStyle = '#d0d7de'; lines.forEach((l, i) => ctx.fillText(l, x0 + 18 * D, y0 + (44 + i * 22) * D));
+      panel(x0, y0, pw, ph); ctx.fillStyle = '#fff'; ctx.font = font(17, 700); ctx.fillText('Controls', x0 + 18 * D, y0 + 14 * D); ctx.font = font(13, 600); ctx.fillStyle = '#f2cc60'; ctx.textAlign = 'right'; ctx.fillText('Press ? or Esc, or click anywhere, to close', x0 + pw - 18 * D, y0 + 17 * D); ctx.textAlign = 'left'; ctx.font = font(14, 500); ctx.fillStyle = '#d0d7de'; lines.forEach((l, i) => ctx.fillText(l, x0 + 18 * D, y0 + (44 + i * 22) * D));
     }
     if (G.bigMap) {
       const s = Math.min((w - 60 * D) / mapCv.width, (h - 60 * D) / mapCv.height), mw = mapCv.width * s, mh = mapCv.height * s, x0 = (w - mw) / 2, y0 = (h - mh) / 2;
