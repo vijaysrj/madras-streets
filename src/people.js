@@ -114,11 +114,11 @@ function buildOutfit(bi, S) {
   const fem = S.female, sh = fem ? 0.92 : 1; // women: narrower shoulders and waist
   const armRings = (t0, r0, r1) => [limb(J.shoulder, J.elbow, t0, r0), limb(J.shoulder, J.elbow, 0.85, lerp(r0, r1, 0.5)), limb(J.elbow, J.wrist, 0.0, r1 * 1.02), limb(J.elbow, J.wrist, 0.5, r1 * 0.95), limb(J.elbow, J.wrist, 1.02, r1 * 0.72)];
   const armW = (p, i) => i === 0 ? [['LeftArm', 1]] : i === 1 ? [['LeftArm', 0.8], ['LeftForeArm', 0.2]] : i === 2 ? [['LeftArm', 0.35], ['LeftForeArm', 0.65]] : i === 3 ? [['LeftForeArm', 1]] : [['LeftForeArm', 0.6], ['LeftHand', 0.4]];
-  const sleeve = (t1, r, cell, col) => { for (const mirror of [false, true]) B.tube([limb(J.shoulder, J.elbow, 0.0, r * 1.0), limb(J.shoulder, J.elbow, 0.2, r * 1.02), limb(J.shoulder, J.elbow, t1, r)], 10, (p, i) => i === 0 ? [['LeftShoulder', 0.5], ['LeftArm', 0.5]] : [['LeftArm', 1]], cell, col, { mirror }); };
+  const sleeve = (t1, r, cell, col) => { for (const mirror of [false, true]) B.tube([limb(J.shoulder, J.elbow, -0.04, r * 0.78), limb(J.shoulder, J.elbow, 0.2, r * 1.0), limb(J.shoulder, J.elbow, t1, r)], 10, (p, i) => i === 0 ? [['LeftShoulder', 0.5], ['LeftArm', 0.5]] : [['LeftArm', 1]], cell, col, { mirror }); };
   const arms = t0 => { for (const mirror of [false, true]) B.tube(armRings(t0, fem ? 0.04 : 0.046, fem ? 0.034 : 0.04), 8, armW, W, skin, { mirror }); };
   const legs = (yTop, col, r = 1) => { for (const mirror of [false, true]) B.tube([V(Math.min(yTop, 1.0), 0.088 * r, 0.09 * r, 0.097, 0.0), V(0.8, 0.078 * r, 0.082 * r, 0.108, 0.0), V(0.567, 0.058 * r, 0.06 * r, 0.125, 0.0), V(0.36, 0.05 * r, 0.052 * r, 0.138, -0.015), V(0.14, 0.036 * r, 0.04 * r, 0.151, -0.04)], 8, p => { const k = smooth(0.5, 0.64, p[1]), a = smooth(0.12, 0.2, p[1]); return [['LeftUpLeg', k], ['LeftLeg', (1 - k) * a], ['LeftFoot', (1 - k) * (1 - a)]]; }, W, col, { mirror }); };
   const torso = (y0, cell, col, loose = 1) => B.tube([
-    V(y0, 0.185 * loose, 0.135 * loose, 0, 0.005, 0), V(1.06, 0.175 * loose * (fem ? 0.9 : 1), 0.128 * loose, 0, 0.008), V(1.2, 0.17 * (fem ? 0.86 : 1) * loose, 0.122 * loose, 0, 0.004),
+    V(y0, 0.198 * loose, 0.15 * loose, 0, 0.004, 0), V(1.06, 0.182 * loose * (fem ? 0.9 : 1), 0.138 * loose, 0, 0.008), V(1.2, 0.17 * (fem ? 0.86 : 1) * loose, 0.122 * loose, 0, 0.004),
     V(1.34, 0.185 * sh, fem ? 0.14 : 0.128, 0, fem ? 0.012 : -0.004), V(1.44, 0.195 * sh, 0.125, 0, -0.012), V(1.5, 0.17 * sh, 0.105, 0, -0.022), V(1.535, 0.085, 0.085, 0, -0.03), V(1.56, 0.062, 0.068, 0, -0.03, 1),
   ].filter(r => r.c[1] >= y0), 14, torsoW, cell, col);
 
@@ -139,10 +139,10 @@ function buildOutfit(bi, S) {
   } else if (S.outfit === 'kameez') {
     const c = C(S.c1), c2 = C(S.c2);
     // long tunic to the knee, leggings, dupatta draped over both shoulders
-    B.tube([V(0.52, 0.215, 0.15, 0, 0, 0), V(0.8, 0.2, 0.145, 0, 0.004, 0.3), V(1.0, 0.185, 0.138, 0, 0.006, 0.5)], 14, p => wrapW(p[0], p[1]), S.cell, c);
+    B.tube([V(0.5, 0.235, 0.2, 0, 0.01, 0), V(0.8, 0.208, 0.168, 0, 0.006, 0.3), V(1.0, 0.185, 0.138, 0, 0.006, 0.5)], 14, p => wrapW(p[0], p[1]), S.cell, c);
     B.tube([V(1.0, 0.185, 0.138, 0, 0.006, 0.5), V(1.06, 0.165, 0.126, 0, 0.008, 0.56), V(1.2, 0.152, 0.118, 0, 0.004, 0.7), V(1.34, 0.172, 0.14, 0, 0.012, 0.84), V(1.44, 0.18, 0.125, 0, -0.012, 0.93), V(1.5, 0.158, 0.105, 0, -0.022, 0.97), V(1.535, 0.09, 0.088, 0, -0.03, 1)], 14, torsoW, S.cell, c);
     B.tube([V(1.535, 0.09, 0.088, 0, -0.03), V(1.56, 0.06, 0.066, 0, -0.03)], 10, torsoW, W, skin);
-    sleeve(0.7, 0.05, W, c); arms(0.6); legs(0.6, c2, 0.95);
+    sleeve(0.7, 0.05, W, c); arms(0.6); legs(0.6, c2, 0.86);
     for (const sx of [1, -1]) B.strip([{ p: [0.0, 1.43, 0.15], w: [0, -0.06, 0.01] }, { p: [sx * 0.09, 1.5, 0.11], w: [0, -0.05, 0.03] }, { p: [sx * 0.125, 1.555, -0.02], w: [0.05, 0, 0] }, { p: [sx * 0.12, 1.45, -0.14], w: [0.055, 0, 0] }, { p: [sx * 0.12, 1.15, -0.16], w: [0.06, 0, 0] }, { p: [sx * 0.12, 0.9, -0.17], w: [0.065, 0, 0] }], p => p[1] < 1.0 ? [['Hips', 0.5], ['Spine', 0.5]] : spineW(p[1]), W, c2);
   } else {
     const shirt = C(S.c1);
@@ -231,12 +231,20 @@ export async function loadPeople() {
     const tgtRoot = gltf.scene, tgtRest = restW(tgtRoot);
     const pairs = []; tgtRoot.traverse(o => { if (!o.isBone) return; const s = srcByName.get(o.name); if (s) pairs.push([o, s]); });
     // the animation rig rests in a T-pose and this one in an A-pose: rotate each limb's rest onto the source limb direction
-    const wp = o => o.getWorldPosition(new THREE.Vector3());
+    const wp = o => o.getWorldPosition(new THREE.Vector3()), align = new Map();
     for (const [tb, sb] of pairs) {
       if (!/Arm|UpLeg|Leg$|Shoulder/.test(tb.name)) continue;
       const ct = tb.children.find(c => c.isBone && srcByName.get(c.name)); if (!ct) continue; const cs = srcByName.get(ct.name);
       const dt = wp(ct).sub(wp(tb)).normalize(), ds = wp(cs).sub(wp(sb)).normalize();
-      tgtRest.set(tb, new THREE.Quaternion().setFromUnitVectors(dt, ds).multiply(tgtRest.get(tb)));
+      const R = new THREE.Quaternion().setFromUnitVectors(dt, ds); align.set(tb, R);
+      tgtRest.set(tb, R.clone().multiply(tgtRest.get(tb)));
+    }
+    // Hands, fingers, feet and toes keep their rest angle relative to the limb they hang from: they take the same correction
+    // as the forearm or shin above them. Without it the wrist is bent by the whole A-pose to T-pose difference and the hands look broken.
+    for (const [tb] of pairs) {
+      if (!/Hand|Foot|Toe/.test(tb.name)) continue;
+      let a = tb.parent; while (a && !align.has(a)) a = a.parent; if (!a) continue;
+      tgtRest.set(tb, align.get(a).clone().multiply(tgtRest.get(tb)));
     }
     const act = srcMixer.clipAction(clip); act.play();
     const fps = 30, n = Math.max(2, Math.round(clip.duration * fps) + 1), times = new Float32Array(n);
@@ -321,7 +329,7 @@ export class Crowd {
       const sh = shadowSet.has(it.slot); if (sh !== it.sh) { it.sh = sh; it.obj.traverse(m => { if (m.isMesh) m.castShadow = sh; }); }
       const dxc = x - cam.x, dzc = z - cam.z, far = dxc * dxc + dzc * dzc > 45 * 45; it.acc = (it.acc || 0) + dt;
       if (far && (this.frame + it.slot) % 3) continue;
-      Crowd.blend(it, st === 2 ? 0 : Math.min(sp, 6), it.acc); it.acc = 0;
+      Crowd.blend(it, st === 2 ? 0 : Math.min(sp, 2.2), it.acc) /* street walkers never break into the run cycle, even when a slow frame makes the measured speed jump */; it.acc = 0;
     }
   }
 }
