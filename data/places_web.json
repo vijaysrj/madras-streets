@@ -1,0 +1,247 @@
+{
+ "note": "Current places along Elliot's Beach (6th Avenue shop side), from web listings Nov 2026 (Tripadvisor, EazyDiner). Murugan Idli Shop and MASH have known addresses; the rest are placed along the beach road in an approximate order.",
+ "elements": [
+  {
+   "type": "node",
+   "id": -9000,
+   "lat": 13.00075,
+   "lon": 80.2707396,
+   "tags": {
+    "name": "MASH Restocafe",
+    "name:ta": "மேஷ் ரெஸ்டோகஃபே",
+    "amenity": "cafe"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9001,
+   "lat": 13.0003,
+   "lon": 80.2706908,
+   "tags": {
+    "name": "Savoury Sea Shell",
+    "name:ta": "சேவரி சீ ஷெல்",
+    "amenity": "restaurant"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9002,
+   "lat": 13.0001105,
+   "lon": 80.2706659,
+   "tags": {
+    "name": "Jonah's Bistro and Patisserie",
+    "name:ta": "ஜோனாஸ் பிஸ்ட்ரோ",
+    "amenity": "cafe"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9003,
+   "lat": 12.9999211,
+   "lon": 80.2706427,
+   "tags": {
+    "name": "Hola",
+    "name:ta": "ஹோலா",
+    "amenity": "restaurant"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9004,
+   "lat": 12.9997316,
+   "lon": 80.2706228,
+   "tags": {
+    "name": "Harry's Wrap and Roll",
+    "name:ta": "ஹாரிஸ் ரேப் அண்ட் ரோல்",
+    "amenity": "fast_food"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9005,
+   "lat": 12.9995421,
+   "lon": 80.2706017,
+   "tags": {
+    "name": "99 Pancakes",
+    "name:ta": "99 பான்கேக்ஸ்",
+    "amenity": "cafe"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9006,
+   "lat": 12.9993526,
+   "lon": 80.2705786,
+   "tags": {
+    "name": "Apsara Ice Creams",
+    "name:ta": "அப்சரா ஐஸ்கிரீம்ஸ்",
+    "amenity": "ice_cream"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9007,
+   "lat": 12.9991632,
+   "lon": 80.2705558,
+   "tags": {
+    "name": "Chennai 90",
+    "name:ta": "சென்னை 90",
+    "amenity": "restaurant"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9008,
+   "lat": 12.9989737,
+   "lon": 80.2705344,
+   "tags": {
+    "name": "Brick House Bistro",
+    "name:ta": "பிரிக் ஹவுஸ் பிஸ்ட்ரோ",
+    "amenity": "restaurant"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9009,
+   "lat": 12.9987842,
+   "lon": 80.2705129,
+   "tags": {
+    "name": "Samy's Dosakall",
+    "name:ta": "சாமிஸ் தோசைக்கல்",
+    "amenity": "restaurant"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9010,
+   "lat": 12.9985947,
+   "lon": 80.2704917,
+   "tags": {
+    "name": "Baskin-Robbins",
+    "name:ta": "பாஸ்கின் ராபின்ஸ்",
+    "amenity": "ice_cream"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9011,
+   "lat": 12.9984053,
+   "lon": 80.2704708,
+   "tags": {
+    "name": "Adaminte Thattukada",
+    "name:ta": "ஆதமிண்டே தட்டுக்கடை",
+    "amenity": "restaurant"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9012,
+   "lat": 12.9982158,
+   "lon": 80.2704499,
+   "tags": {
+    "name": "Shree Saravana Bakery",
+    "name:ta": "ஸ்ரீ சரவணா பேக்கரி",
+    "shop": "bakery"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9013,
+   "lat": 12.9980263,
+   "lon": 80.270429,
+   "tags": {
+    "name": "Downtown Cafe",
+    "name:ta": "டவுன்டவுன் கஃபே",
+    "amenity": "cafe"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9014,
+   "lat": 12.9978368,
+   "lon": 80.2704081,
+   "tags": {
+    "name": "Karaikudi Chettinad Restaurant",
+    "name:ta": "காரைக்குடி செட்டிநாடு உணவகம்",
+    "amenity": "restaurant"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9015,
+   "lat": 12.9976474,
+   "lon": 80.2703872,
+   "tags": {
+    "name": "Little Soi",
+    "name:ta": "லிட்டில் சோய்",
+    "amenity": "restaurant"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9016,
+   "lat": 12.9974579,
+   "lon": 80.2703663,
+   "tags": {
+    "name": "Qua",
+    "name:ta": "க்வா",
+    "amenity": "cafe"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9017,
+   "lat": 12.9972684,
+   "lon": 80.2703455,
+   "tags": {
+    "name": "Rasanai",
+    "name:ta": "ரசனை",
+    "amenity": "restaurant"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9018,
+   "lat": 12.9970789,
+   "lon": 80.2703246,
+   "tags": {
+    "name": "Dindigul Thalappakatti",
+    "name:ta": "திண்டுக்கல் தலப்பாக்கட்டி",
+    "amenity": "restaurant"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9019,
+   "lat": 12.9968895,
+   "lon": 80.2703037,
+   "tags": {
+    "name": "Play Bae Cafe",
+    "name:ta": "ப்ளே பே கஃபே",
+    "amenity": "cafe"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9020,
+   "lat": 12.9967,
+   "lon": 80.2702828,
+   "tags": {
+    "name": "Auro Pizza",
+    "name:ta": "ஆரோ பீட்சா",
+    "amenity": "fast_food"
+   }
+  },
+  {
+   "type": "node",
+   "id": -9021,
+   "lat": 12.99575,
+   "lon": 80.27021,
+   "tags": {
+    "name": "Murugan Idli Shop",
+    "name:ta": "முருகன் இட்லி கடை",
+    "amenity": "restaurant"
+   }
+  }
+ ]
+}

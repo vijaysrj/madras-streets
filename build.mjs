@@ -22,6 +22,8 @@ for (const e of src.elements) {
   if (e.type === 'way') { const n = e.nodes || []; if (!(e.geometry || []).some(inside)) continue; if (t.waterway) e.geometry = e.geometry.filter(inside); els.push({ type: 'way', id: e.id, nodes: t.highway ? n : [n[0], n[n.length - 1]], tags: t, geometry: geo(e.geometry) }); }
   else if (e.type === 'relation') els.push({ type: 'relation', id: e.id, tags: t, members: (e.members || []).filter(m => m.type === 'way' && m.geometry).map(m => ({ role: m.role, geometry: geo(m.geometry) })) });
 }
+// current places found on the web (data/places_web.json) go first so they get the shop boards
+if (id === 'bn' && fs.existsSync('data/places_web.json')) { const extra = JSON.parse(fs.readFileSync('data/places_web.json', 'utf8')).elements; const seen = new Set(extra.map(e => e.tags.name.toLowerCase())); for (let i = els.length - 1; i >= 0; i--) if (els[i].type === 'node' && els[i].tags.name && seen.has(els[i].tags.name.toLowerCase())) els.splice(i, 1); els.unshift(...extra); }
 const osm = JSON.stringify({ bounds: BB, elements: els });
   fs.writeFileSync(`data/osm.${id}.json`, osm);
   console.log('osm', id, (osm.length / 1e6).toFixed(2), 'MB raw');
